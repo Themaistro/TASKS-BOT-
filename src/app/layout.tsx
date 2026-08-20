@@ -26,25 +26,18 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f8fafc] text-slate-900 overflow-hidden`}>
         <div className="h-screen flex flex-col">
-          <header className="h-16 w-full flex items-center justify-between px-6 lg:px-8 shrink-0 z-50 bg-transparent">
-            <div className="flex items-center gap-3 pl-12 lg:pl-0">
-              <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shadow-md shadow-slate-900/10 transition-transform hover:scale-105 cursor-pointer">
-                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 2 22 12 17 22 22 12 2" />
+          <header className="h-14 w-full flex items-center justify-between px-6 lg:px-8 shrink-0 z-50 bg-white/70 backdrop-blur-[20px] border-b border-black/[0.08]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-[7px] bg-gradient-to-b from-[#611f69] to-[#4A154B] flex items-center justify-center shadow-[0_2px_8px_rgba(74,21,75,0.3)] ring-1 ring-white/20 inset-0">
+                <svg className="w-[18px] h-[18px] text-white drop-shadow-sm" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522-2.52h-6.313z"/>
                 </svg>
               </div>
-              <h1 className="font-bold tracking-tight text-slate-800 text-[15px]">Tradeling</h1>
+              <h1 className="font-semibold text-black text-[17px] tracking-[-0.41px]">Slack Roster</h1>
             </div>
             
-            <div className="flex items-center">
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white border border-slate-200/60 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] text-slate-600 cursor-default">
-                <span className="relative flex w-2 h-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full w-2 h-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-[11px] font-bold text-slate-600 tracking-wide">Sync Live</span>
-              </div>
-            </div>
+            {/* Right side remains empty */}
+            <div></div>
           </header>
           <main className="flex-1 w-full overflow-hidden flex">
             {children}
