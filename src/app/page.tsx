@@ -6,9 +6,10 @@ import { DndContext, closestCenter, DragOverlay, PointerSensor, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableCategory, DroppableCategoryCard, DraggableAssignment, DraggableEmployee, AssignmentCardUI } from './dnd-components';
 
-type Employee = { id: string; name: string; slackId: string; onLeaveDays: string };
-type Category = { id: string; name: string; order: number };
-type Assignment = { id: string; categoryId: string; employeeId: string; dayOfWeek: number; note: string | null; employee: Employee };
+export type BreakSchedule = { id: string; employeeId: string; dayOfWeek: number; startTime: string; endTime: string };
+export type Employee = { id: string; name: string; slackId: string; onLeaveDays: string; breakSchedules?: BreakSchedule[] };
+export type Category = { id: string; name: string; order: number; excludedDays?: string; icon?: string };
+export type Assignment = { id: string; categoryId: string; employeeId: string; dayOfWeek: number; note: string | null; employee: Employee; category?: Category };
 
 const DAYS = [
   { val: 1, label: 'Monday' }, { val: 2, label: 'Tuesday' }, { val: 3, label: 'Wednesday' },
@@ -778,12 +779,11 @@ export default function Dashboard() {
                         <div className={`w-8 h-8 rounded-full ${getAvatarColor(emp.name)} text-white flex items-center justify-center text-[11px] font-bold shadow-inner ring-2 ring-white shrink-0`}>
                           {getInitials(emp.name)}
                         </div>
-                        <div className="flex-1 min-w-0 cursor-text" onDoubleClick={() => { setEditingEmpId(emp.id); setEditingEmpName(emp.name); setEditingEmpSlack(emp.slackId); setEditingEmpBreak(emp.breakTime || ''); }} onPointerDown={(e) => e.stopPropagation()}>
+                        <div className="flex-1 min-w-0 cursor-text" onDoubleClick={() => { setEditingEmpId(emp.id); setEditingEmpName(emp.name); setEditingEmpSlack(emp.slackId); }} onPointerDown={(e) => e.stopPropagation()}>
                           {editingEmpId === emp.id ? (
                             <div className="flex flex-col gap-1 w-full max-w-[120px]">
                               <input autoFocus className="text-xs font-bold text-slate-800 border-b border-indigo-300 outline-none bg-transparent py-0.5 min-w-0 w-full" value={editingEmpName} onChange={e => setEditingEmpName(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEditedEmployee(emp.id)} onBlur={() => saveEditedEmployee(emp.id)} />
                               <input className="text-[10px] text-slate-500 font-mono border-b border-indigo-200 outline-none bg-transparent py-0.5 min-w-0 w-full" value={editingEmpSlack} onChange={e => setEditingEmpSlack(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEditedEmployee(emp.id)} onBlur={() => saveEditedEmployee(emp.id)} placeholder="Slack ID" />
-                              <input className="text-[10px] text-orange-600 font-medium border-b border-orange-200 outline-none bg-transparent py-0.5 min-w-0 w-full" value={editingEmpBreak} onChange={e => setEditingEmpBreak(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEditedEmployee(emp.id)} onBlur={() => saveEditedEmployee(emp.id)} placeholder="Break time (from X to Y)" />
                             </div>
                           ) : (
                             <>
@@ -1208,7 +1208,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* Global Fixed Break Time Picker */}
+      
       {breakPicker && (
         <div
           className="fixed z-[500] bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-72"

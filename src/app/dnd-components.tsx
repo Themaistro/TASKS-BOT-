@@ -2,10 +2,54 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, X, Edit2, Eye, EyeOff, Coffee } from 'lucide-react';
+import { GripVertical, Trash2, X, Edit2, EyeOff, Coffee } from 'lucide-react';
 
-export function SortableCategory({ cat, deleteCategory, toggleVisibility, isHidden, icon }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `cat-sort-${cat.id}`, data: cat });
+export interface BreakSchedule {
+  id: string;
+  employeeId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  slackId?: string;
+  breakSchedules?: BreakSchedule[];
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  order: number;
+  excludedDays?: string;
+  icon?: string;
+}
+
+export interface Assignment {
+  id: string;
+  dayOfWeek: number;
+  employeeId: string;
+  categoryId: string;
+  note: string | null;
+  employee?: Employee;
+  category?: Category;
+}
+
+interface SortableCategoryProps {
+  cat: Category;
+  deleteCategory: (id: string) => void;
+  toggleVisibility: (e: React.MouseEvent) => void;
+  isHidden: boolean;
+  icon: React.ReactNode;
+}
+
+export function SortableCategory({ cat, deleteCategory, toggleVisibility, isHidden, icon }: SortableCategoryProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: `cat-sort-${cat.id}`, 
+    data: cat 
+  });
   
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -29,8 +73,16 @@ export function SortableCategory({ cat, deleteCategory, toggleVisibility, isHidd
   );
 }
 
-export function DroppableCategoryCard({ cat, children }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `drop-${cat.id}`, data: cat });
+interface DroppableCategoryCardProps {
+  cat: Category;
+  children: React.ReactNode;
+}
+
+export function DroppableCategoryCard({ cat, children }: DroppableCategoryCardProps) {
+  const { setNodeRef, isOver } = useDroppable({ 
+    id: `drop-${cat.id}`, 
+    data: cat 
+  });
   
   return (
     <div ref={setNodeRef} className={`bg-white rounded-2xl border transition-all duration-200 flex flex-col ${isOver ? 'border-indigo-400 ring-4 ring-indigo-50 bg-indigo-50/20 scale-[1.02] shadow-xl z-20 relative' : 'border-slate-200 shadow-sm hover:shadow-md'}`}>
@@ -39,11 +91,26 @@ export function DroppableCategoryCard({ cat, children }) {
   );
 }
 
-export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNoteVal, setEditNoteVal, saveEditedNote, removeAssignment, getAvatarColor, getInitials, isOverlay = false, breakSchedules = [] }) {
-  // Find the break schedule for this assignment's specific day
-  const dayBreak = (breakSchedules as any[]).find(b => b.employeeId === a?.employee?.id && b.dayOfWeek === a?.dayOfWeek);
-  const formatBT = (t: string) => {
-    const [h, m] = t.split(':').map(Number);
+interface AssignmentProps {
+  a: Assignment;
+  absent: boolean;
+  editNoteId: string | null;
+  setEditNoteId: (id: string | null) => void;
+  editNoteVal: string;
+  setEditNoteVal: (val: string) => void;
+  saveEditedNote: (id: string) => void;
+  removeAssignment: (id: string) => void;
+  getAvatarColor: (name: string) => string;
+  getInitials: (name: string) => string;
+  isOverlay?: boolean;
+  breakSchedules?: BreakSchedule[];
+}
+
+export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNoteVal, setEditNoteVal, saveEditedNote, removeAssignment, getAvatarColor, getInitials, isOverlay = false, breakSchedules = [] }: AssignmentProps) {
+  const dayBreak = breakSchedules.find(b => b.employeeId === a.employee?.id && b.dayOfWeek === a.dayOfWeek);
+  
+  const formatBreakTime = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
     return `${h % 12 || 12}:${m.toString().padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
   };
 
@@ -54,16 +121,16 @@ export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNot
       </div>
 
       <div className={`flex items-center gap-2.5 px-3 py-2 border-r w-1/3 shrink-0 ${absent ? 'bg-red-50 border-red-200' : 'border-slate-100'}`}>
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-1 shrink-0 ${absent ? 'bg-red-400 ring-red-500' : `${getAvatarColor(a?.employee?.name || '')} ring-white`}`}>
-          {absent ? <X className="w-3 h-3"/> : getInitials(a?.employee?.name || '')}
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-1 shrink-0 ${absent ? 'bg-red-400 ring-red-500' : `${getAvatarColor(a.employee?.name || '')} ring-white`}`}>
+          {absent ? <X className="w-3 h-3"/> : getInitials(a.employee?.name || '')}
         </div>
         <div className="flex flex-col flex-1 min-w-0 justify-center leading-tight">
           <span className={`font-bold truncate w-full ${absent ? 'text-red-900' : 'text-slate-800'}`}>
-            {a?.employee?.name || 'Loading'}
+            {a.employee?.name || 'Loading'}
           </span>
           {dayBreak && (
             <span className={`text-[9.5px] font-medium truncate flex items-center gap-1 mt-0.5 ${absent ? 'text-red-700' : 'text-orange-500'}`}>
-              <Coffee className="w-2.5 h-2.5 shrink-0" /> {formatBT(dayBreak.startTime)}–{formatBT(dayBreak.endTime)}
+              <Coffee className="w-2.5 h-2.5 shrink-0" /> {formatBreakTime(dayBreak.startTime)} - {formatBreakTime(dayBreak.endTime)}
             </span>
           )}
         </div>
@@ -74,7 +141,7 @@ export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNot
           <input autoFocus className={`text-[11px] w-full px-3 py-2 outline-none bg-transparent font-medium ${absent ? 'text-red-900 placeholder:text-red-300' : 'text-slate-700 placeholder:text-slate-300'}`} placeholder="Type note..." value={editNoteVal} onChange={e => setEditNoteVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEditedNote(a.id); }} onBlur={() => saveEditedNote(a.id)} />
         </div>
       ) : (
-        <div onPointerDown={(e) => { if(!isOverlay && setEditNoteId) { e.stopPropagation(); setEditNoteId(a.id); setEditNoteVal(a.note || ''); } }} className={`px-3 py-2 flex items-center flex-1 cursor-text transition-colors ${absent ? 'bg-red-50 text-red-800 hover:bg-red-100' : 'text-slate-600 hover:bg-slate-50'}`}>
+        <div onPointerDown={(e) => { if(!isOverlay) { e.stopPropagation(); setEditNoteId(a.id); setEditNoteVal(a.note || ''); } }} className={`px-3 py-2 flex items-center flex-1 cursor-text transition-colors ${absent ? 'bg-red-50 text-red-800 hover:bg-red-100' : 'text-slate-600 hover:bg-slate-50'}`}>
           {a.note ? <span className="font-medium text-[11px] truncate">{a.note}</span> : <span className={`italic flex items-center gap-1.5 text-[10px] ${absent ? 'text-red-400' : 'text-slate-400'}`}><Edit2 className="w-3 h-3"/> Add note</span>}
         </div>
       )}
@@ -88,29 +155,32 @@ export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNot
   );
 }
 
-export function DraggableAssignment({ a, absent, editNoteId, setEditNoteId, editNoteVal, setEditNoteVal, saveEditedNote, removeAssignment, getAvatarColor, getInitials, breakSchedules = [] }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `assign-${a.id}`, data: a });
+export function DraggableAssignment(props: AssignmentProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ 
+    id: `assign-${props.a.id}`, 
+    data: props.a 
+  });
   
-  const style = {
-    opacity: isDragging ? 0.3 : 1,
-  };
-
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}>
-      <AssignmentCardUI a={a} absent={absent} editNoteId={editNoteId} setEditNoteId={setEditNoteId} editNoteVal={editNoteVal} setEditNoteVal={setEditNoteVal} saveEditedNote={saveEditedNote} removeAssignment={removeAssignment} getAvatarColor={getAvatarColor} getInitials={getInitials} isOverlay={false} breakSchedules={breakSchedules} />
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.3 : 1 }} {...attributes} {...listeners} className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}>
+      <AssignmentCardUI {...props} isOverlay={false} />
     </div>
   );
 }
 
-export function DraggableEmployee({ emp, children }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `emp-${emp.id}`, data: emp });
-  
-  const style = {
-    opacity: isDragging ? 0.4 : 1,
-  };
+interface DraggableEmployeeProps {
+  emp: Employee;
+  children: React.ReactNode;
+}
 
+export function DraggableEmployee({ emp, children }: DraggableEmployeeProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ 
+    id: `emp-${emp.id}`, 
+    data: emp 
+  });
+  
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}>
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners} className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}>
       {children}
     </div>
   );

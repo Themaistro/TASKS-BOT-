@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     });
 
     // 2. Post Each Category
-    const employeeTasks: Record<string, { name: string, tasks: any[] }> = {};
+    const employeeTasks: Record<string, { name: string, tasks: any[], breakSchedules?: any[] }> = {};
 
     for (const cat of activeCategories) {
       const emoji = cat.icon || '📌';
