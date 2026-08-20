@@ -533,36 +533,36 @@ export default function Dashboard() {
         
         <div className="shrink-0 flex flex-col gap-3">
           {/* Main Automation Toggle Box */}
-          <div className="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-4 relative overflow-hidden flex flex-col gap-2">
+          <div className="bg-[#3F0E40] rounded-2xl shadow-lg border border-[#5c1a63] p-4 relative overflow-hidden flex flex-col gap-2">
             <div className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${isAutoActive ? 'bg-emerald-500/10 opacity-100' : 'bg-slate-800/20 opacity-0'}`}></div>
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full pointer-events-none"></div>
             
             <div className="flex items-center justify-between w-full relative z-10 cursor-pointer group" onClick={() => { const val = !isAutoActive; setIsAutoActive(val); saveConfig({ isAutomationActive: val }); }}>
               <div className="flex items-center gap-2 font-bold text-white">
-                <div className={`p-2 rounded-lg transition-colors ${isAutoActive ? 'bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/30' : 'bg-slate-800 text-slate-500 group-hover:text-slate-400'}`}><Clock className="w-4 h-4" /></div>
+                <div className={`p-2 rounded-lg transition-colors ${isAutoActive ? 'bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/30' : 'bg-[#5c1a63] text-purple-200 group-hover:text-white'}`}><Clock className="w-4 h-4" /></div>
                 <h3 className="text-sm">Automation</h3>
               </div>
-              <div className={`w-12 h-6 rounded-full relative transition-colors shadow-inner ${isAutoActive ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-slate-700 group-hover:bg-slate-600'}`}>
+              <div className={`w-12 h-6 rounded-full relative transition-colors shadow-inner ${isAutoActive ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-[#5c1a63] group-hover:bg-[#611f69]'}`}>
                 <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all shadow-md ${isAutoActive ? 'left-[26px]' : 'left-1'}`}></div>
               </div>
             </div>
             
             <div className="w-full relative z-10 flex justify-between items-end mt-1 mb-2">
               <div className="flex flex-col">
-                <span className={`text-[10px] font-bold tracking-widest uppercase flex items-center gap-1.5 ${isAutoActive ? 'text-emerald-400' : 'text-slate-500'}`}>
+                <span className={`text-[10px] font-bold tracking-widest uppercase flex items-center gap-1.5 ${isAutoActive ? 'text-emerald-400' : 'text-purple-200'}`}>
                   {isAutoActive ? <><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Running</> : <><div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div> Paused</>}
                 </span>
               </div>
               {isAutoActive && (
                 <div className="flex flex-col items-end">
-                  <span className="text-[9px] text-slate-400">Next automated post in</span>
+                  <span className="text-[9px] text-purple-300">Next automated post in</span>
                   <span className="text-xs font-mono font-bold text-emerald-300">{timeUntilNext || '...'}</span>
                 </div>
               )}
             </div>
 
-            <div className="w-full relative z-10 border-t border-slate-700/50 pt-3 mt-1 flex justify-center">
-              <button onClick={() => setIsAutomationExpanded(!isAutomationExpanded)} className="text-[10px] uppercase tracking-widest font-bold text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+            <div className="w-full relative z-10 border-t border-[#5c1a63]/50 pt-3 mt-1 flex justify-center">
+              <button onClick={() => setIsAutomationExpanded(!isAutomationExpanded)} className="text-[10px] uppercase tracking-widest font-bold text-purple-200 hover:text-white flex items-center gap-1 transition-colors">
                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isAutomationExpanded ? 'rotate-180' : ''}`} />
                  {isAutomationExpanded ? 'Hide Settings' : 'Advanced Settings'}
               </button>
@@ -591,19 +591,19 @@ export default function Dashboard() {
               };
 
               return (
-                <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
-                  <span className="text-xs uppercase font-black tracking-widest text-slate-300">Time</span>
+                <div className="bg-[#4A154B] border border-[#5c1a63] rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
+                  <span className="text-xs uppercase font-black tracking-widest text-purple-100">Time</span>
                   <div className="flex items-center gap-2">
-                    <select value={currentH12.toString()} onChange={e => updateTime(e.target.value, currentM, ampm)} className="appearance-none bg-slate-700/80 text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
+                    <select value={currentH12.toString()} onChange={e => updateTime(e.target.value, currentM, ampm)} className="appearance-none bg-[#3F0E40] text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
                       {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
                     </select>
-                    <span className="text-slate-400 font-extrabold text-xl">:</span>
-                    <select value={currentM} onChange={e => updateTime(currentH12.toString(), e.target.value, ampm)} className="appearance-none bg-slate-700/80 text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
+                    <span className="text-purple-300 font-extrabold text-xl">:</span>
+                    <select value={currentM} onChange={e => updateTime(currentH12.toString(), e.target.value, ampm)} className="appearance-none bg-[#3F0E40] text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
                       {['00','15','30','45'].map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
-                    <div className="flex bg-slate-700/80 rounded-lg p-1 ml-auto shadow-inner border border-slate-600/50">
-                      <button onClick={() => updateTime(currentH12.toString(), currentM, 'AM')} className={`text-[10px] font-extrabold px-3 py-1.5 rounded-md transition-colors ${ampm === 'AM' ? 'bg-emerald-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}>AM</button>
-                      <button onClick={() => updateTime(currentH12.toString(), currentM, 'PM')} className={`text-[10px] font-extrabold px-3 py-1.5 rounded-md transition-colors ${ampm === 'PM' ? 'bg-emerald-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}>PM</button>
+                    <div className="flex bg-[#3F0E40] rounded-lg p-1 ml-auto shadow-inner border border-slate-600/50">
+                      <button onClick={() => updateTime(currentH12.toString(), currentM, 'AM')} className={`text-[10px] font-extrabold px-3 py-1.5 rounded-md transition-colors ${ampm === 'AM' ? 'bg-emerald-500 text-white shadow' : 'text-purple-200 hover:text-white'}`}>AM</button>
+                      <button onClick={() => updateTime(currentH12.toString(), currentM, 'PM')} className={`text-[10px] font-extrabold px-3 py-1.5 rounded-md transition-colors ${ampm === 'PM' ? 'bg-emerald-500 text-white shadow' : 'text-purple-200 hover:text-white'}`}>PM</button>
                     </div>
                   </div>
                   <div className={`absolute bottom-0 left-0 w-full h-1 transition-colors ${isTimeDirty ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-transparent'}`}></div>
@@ -617,9 +617,9 @@ export default function Dashboard() {
             })()}
 
             {/* Timezone */}
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
-              <span className="text-xs uppercase font-black tracking-widest text-slate-300">Timezone</span>
-              <select value={timezone} onChange={e => setTimezone(e.target.value)} className="bg-slate-700/80 text-white text-sm font-bold font-mono p-3 rounded-lg outline-none w-full shadow-inner hover:bg-slate-600 transition-colors cursor-pointer border border-slate-600/50">
+            <div className="bg-[#4A154B] border border-[#5c1a63] rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
+              <span className="text-xs uppercase font-black tracking-widest text-purple-100">Timezone</span>
+              <select value={timezone} onChange={e => setTimezone(e.target.value)} className="bg-[#3F0E40] text-white text-sm font-bold font-mono p-3 rounded-lg outline-none w-full shadow-inner hover:bg-slate-600 transition-colors cursor-pointer border border-slate-600/50">
                 <option value="Asia/Dubai">Asia/Dubai</option>
                 <option value="Europe/London">Europe/London</option>
                 <option value="America/New_York">America/New_York</option>
@@ -633,10 +633,10 @@ export default function Dashboard() {
             </div>
 
             {/* Target Channel */}
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
-              <span className="text-xs uppercase font-black tracking-widest text-slate-300">Target Slack Channel</span>
-              <div className="flex items-center gap-2 bg-slate-700/50 p-2.5 rounded-lg border border-slate-600/50 shadow-inner focus-within:border-indigo-500/50 focus-within:bg-slate-700 transition-all">
-                <span className="text-slate-400 font-extrabold text-lg pl-1">#</span>
+            <div className="bg-[#4A154B] border border-[#5c1a63] rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
+              <span className="text-xs uppercase font-black tracking-widest text-purple-100">Target Slack Channel</span>
+              <div className="flex items-center gap-2 bg-[#3F0E40]/50 p-2.5 rounded-lg border border-slate-600/50 shadow-inner focus-within:border-indigo-500/50 focus-within:bg-slate-700 transition-all">
+                <span className="text-purple-300 font-extrabold text-lg pl-1">#</span>
                 <input type="text" value={slackChannel} onChange={e => setSlackChannel(e.target.value)} className="bg-transparent text-white text-base font-bold outline-none w-full font-mono placeholder-slate-500" placeholder="channel-id" />
               </div>
               <div className={`absolute bottom-0 left-0 w-full h-1 transition-colors ${isChannelDirty ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-transparent'}`}></div>
@@ -648,8 +648,8 @@ export default function Dashboard() {
             </div>
 
             {/* Working Days */}
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
-              <span className="text-xs uppercase font-black tracking-widest text-slate-300">Active Work Days</span>
+            <div className="bg-[#4A154B] border border-[#5c1a63] rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
+              <span className="text-xs uppercase font-black tracking-widest text-purple-100">Active Work Days</span>
               <div className="flex gap-2 justify-between mt-1">
                 {[0,1,2,3,4,5,6].map(d => {
                   const isActive = workingDays.split(',').includes(d.toString());
@@ -663,7 +663,7 @@ export default function Dashboard() {
                       const str = days.join(',');
                       setWorkingDays(str);
                       if (!days.includes(activeDay.toString()) && days.length > 0) setActiveDay(Number(days[0]));
-                    }} className={`w-10 h-10 rounded-full text-sm font-black transition-transform hover:scale-110 ${isActive ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-800' : 'bg-slate-700/80 text-slate-400 hover:bg-slate-600 hover:text-white'}`}>
+                    }} className={`w-10 h-10 rounded-full text-sm font-black transition-transform hover:scale-110 ${isActive ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-800' : 'bg-[#3F0E40] text-purple-300 hover:bg-slate-600 hover:text-white'}`}>
                       {dayLabels[d]}
                     </button>
                   );
@@ -678,9 +678,9 @@ export default function Dashboard() {
             </div>
 
             {/* Message Header */}
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
-              <span className="text-xs uppercase font-black tracking-widest text-slate-300">Message Header</span>
-              <textarea value={slackMessageHeader} onChange={e => setSlackMessageHeader(e.target.value)} className="bg-slate-700/50 text-white text-sm font-medium p-4 rounded-lg outline-none w-full font-mono h-24 resize-none placeholder-slate-500 focus:bg-slate-700 border border-slate-600/50 focus:border-indigo-500/50 transition-all shadow-inner leading-relaxed" placeholder="Slack mrkdwn allowed" />
+            <div className="bg-[#4A154B] border border-[#5c1a63] rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
+              <span className="text-xs uppercase font-black tracking-widest text-purple-100">Message Header</span>
+              <textarea value={slackMessageHeader} onChange={e => setSlackMessageHeader(e.target.value)} className="bg-[#3F0E40]/50 text-white text-sm font-medium p-4 rounded-lg outline-none w-full font-mono h-24 resize-none placeholder-slate-500 focus:bg-slate-700 border border-slate-600/50 focus:border-indigo-500/50 transition-all shadow-inner leading-relaxed" placeholder="Slack mrkdwn allowed" />
               <div className={`absolute bottom-0 left-0 w-full h-1 transition-colors ${isHeaderDirty ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-transparent'}`}></div>
               {isHeaderDirty && (
                 <button onClick={() => saveConfig({slackMessageHeader}, 'Header updated')} className="mt-1 w-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500 hover:text-white text-[10px] font-bold py-1.5 rounded transition-colors uppercase tracking-wider animate-in fade-in zoom-in-95 duration-200">
@@ -690,7 +690,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <button onClick={testBot} className="w-full flex items-center justify-center gap-2 bg-[#4A154B] text-white text-sm font-bold py-4 rounded-xl shadow-lg hover:bg-[#3B113B] transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-[#611f69] hover:shadow-xl mt-3">
+          <button onClick={testBot} className="w-full flex items-center justify-center gap-2 bg-[#007A5A] text-white text-sm font-bold py-4 rounded-xl shadow-lg hover:bg-[#148567] transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-[#006248] hover:shadow-xl mt-3">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522-2.52h-6.313z"/>
             </svg>
