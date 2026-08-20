@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tradeling Task Bot
 
-## Getting Started
+An automated scheduling and daily roster management system integrated directly with Slack via Socket Mode. It allows managers to visually drag and drop employees into tasks, set break schedules, and automatically publish a clean daily roster to Slack at 8:00 AM.
 
-First, run the development server:
+## 🚀 Features
 
+- **Visual Roster Dashboard:** Next.js drag-and-drop interface to assign employees to daily tasks.
+- **Per-Day Break Scheduling:** Assign precise 5-minute increment breaks for employees based on the day of the week.
+- **Automated Slack Posting:** Background `node-cron` scheduler posts the roster every morning at 8:00 AM automatically.
+- **Individual Slack DMs:** Employees receive a private Direct Message with their specific task and break time.
+- **Socket Mode Integration:** Acknowledge buttons ("Acknowledge ✅") on the Slack messages update the web dashboard in real-time without requiring a public HTTPS endpoint.
+- **In-App Slack Configuration:** Safely update Slack API tokens directly from the web UI.
+
+## 🛠️ Tech Stack
+
+- **Frontend:** Next.js (App Router), React, Tailwind CSS, `@dnd-kit`
+- **Backend:** Node.js, `server.js` background worker, Next.js API Routes
+- **Database:** Prisma ORM, SQLite (easily swappable to PostgreSQL)
+- **Slack:** `@slack/socket-mode`, `@slack/web-api`
+
+## 📦 Local Development Setup
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Environment Variables:**
+   Copy the example environment file and fill in your Slack credentials.
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Initialize the Database:**
+   Generate the Prisma client and push the schema to create the SQLite file.
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
+
+4. **Start the Application:**
+   This starts both the Next.js dashboard and the background Slack Socket worker.
+   ```bash
+   npm run dev
+   ```
+
+5. **Open Dashboard:**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 🚢 Production Deployment
+
+For corporate deployments (AWS, Azure, GCP, or internal servers), a `Dockerfile` is included.
+
+### Using Docker
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker build -t tradeling-task-bot .
+docker run -p 3000:3000 -v /path/to/persistent/data:/app/prisma --env-file .env tradeling-task-bot
 ```
+*(Note: Ensure `/app/prisma` is mounted as a persistent volume if continuing to use SQLite to prevent data loss on container restarts. Alternatively, change `provider = "sqlite"` to `"postgresql"` in `schema.prisma` and point `DATABASE_URL` to a managed DB).*
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Slack App Requirements
+Ensure the Slack App in your workspace has the following configurations:
+- **Socket Mode:** Enabled
+- **Scopes:** `chat:write`, `channels:read`, `im:write`, `users:read`
+- **Events Subscriptions:** Enabled (Listening for `interactive` actions)
