@@ -26,19 +26,23 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f8fafc] text-slate-900 overflow-hidden`}>
         <div className="h-screen flex flex-col">
-          <header className="h-16 bg-[#0B132B] text-white border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-50">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center font-bold text-lg shadow-sm">
-                T
+          <header className="h-16 w-full flex items-center justify-between px-6 lg:px-8 shrink-0 z-50 bg-transparent">
+            <div className="flex items-center gap-3 pl-12 lg:pl-0">
+              <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shadow-md shadow-slate-900/10 transition-transform hover:scale-105 cursor-pointer">
+                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 2 22 12 17 22 22 12 2" />
+                </svg>
               </div>
-              <div>
-                <h1 className="font-bold tracking-wide text-sm">Tradeling Task Bot</h1>
-                <p className="text-[10px] text-slate-400 font-medium">Command Center</p>
-              </div>
+              <h1 className="font-bold tracking-tight text-slate-800 text-[15px]">Tradeling</h1>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold">
-                AK
+            
+            <div className="flex items-center">
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white border border-slate-200/60 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] text-slate-600 cursor-default">
+                <span className="relative flex w-2 h-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full w-2 h-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[11px] font-bold text-slate-600 tracking-wide">Sync Live</span>
               </div>
             </div>
           </header>
