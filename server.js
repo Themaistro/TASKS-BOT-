@@ -4,67 +4,37 @@ const next = require('next');
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
 const { WebClient } = require('@slack/web-api');
-const { SocketModeClient } = require('@slack/socket-mode');
-
-// Load environment variables directly so they are available immediately
-require('dotenv').config();
+const { App } = require('@slack/socket-mode');
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
-
 const prisma = new PrismaClient();
 
 app.prepare().then(() => {
-  // Start Slack Socket Mode if Token exists
-  const appToken = process.env.SLACK_APP_TOKEN;
-  if (appToken) {
-    const socketClient = new SocketModeClient({ appToken });
-    const slackWeb = new WebClient(process.env.SLACK_BOT_TOKEN);
-
-    socketClient.on('interactive', async ({ body, ack }) => {
-      await ack(); // Tell Slack we received the interaction
-      
-      if (body.type === 'block_actions' && body.actions?.[0]?.action_id === 'ack_btn') {
-        const userId = body.user.id;
-        const originalBlocks = body.message.blocks;
-        
-        let ackBlock = originalBlocks.find(b => b.block_id === 'ack_block');
-        if (!ackBlock) {
-          ackBlock = {
-            type: 'context',
-            block_id: 'ack_block',
-            elements: [{ type: 'mrkdwn', text: `*✅ Acknowledged by:* <@${userId}>` }]
-          };
-          const actionsIdx = originalBlocks.findIndex((b) => b.type === 'actions');
-          if (actionsIdx > -1) {
-            originalBlocks.splice(actionsIdx, 0, ackBlock);
-          } else {
-            originalBlocks.push(ackBlock);
-          }
-        } else {
-          const text = ackBlock.elements[0].text;
-          if (!text.includes(`<@${userId}>`)) {
-            ackBlock.elements[0].text = `${text}, <@${userId}>`;
-          }
-        }
-
-        try {
-          await slackWeb.chat.update({
-            channel: body.channel.id,
-            ts: body.message.ts,
-            blocks: originalBlocks,
-            text: body.message.text
-          });
-        } catch (e) {
-          console.error("Failed to update slack message:", e);
-        }
-      }
+  // Socket Mode Slack Setup
+  if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
+    const slackApp = new App({
+      appToken: process.env.SLACK_APP_TOKEN,
+      token: process.env.SLACK_BOT_TOKEN
     });
 
-    socketClient.start().then(() => {
-      console.log('> ⚡️ Slack Socket Mode is active. Listening for button clicks...');
+    slackApp.start().then(() => {
+      console.log('⚡️ Slack Socket Mode is running!');
     }).catch(console.error);
+
+    // Listen for button clicks
+    slackApp.client.on('interactive', async (payload) => {
+      const body = JSON.parse(payload.body);
+      if (body.type === 'block_actions' && body.actions?.[0]?.action_id === 'ack_btn') {
+        const categoryId = body.actions[0].value.replace('ack_', '');
+        const userId = body.user.id;
+        console.log(`[SLACK] User ${userId} acknowledged category ${categoryId}`);
+        // Optionally update the DB here
+      }
+    });
+  } else {
+    console.log('[WARNING] SLACK_BOT_TOKEN or SLACK_APP_TOKEN missing. Socket mode disabled.');
   }
 
   createServer((req, res) => {
@@ -75,7 +45,7 @@ app.prepare().then(() => {
     console.log('> Ready on http://localhost:3000');
     
     if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_CHANNEL_ID) {
-      console.warn('⚠️  SLACK_BOT_TOKEN or SLACK_CHANNEL_ID missing! Bot will not post to Slack.');
+      console.warn('[WARNING] SLACK_BOT_TOKEN or SLACK_CHANNEL_ID missing! Bot will not post to Slack.');
     }
 
     const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
@@ -90,8 +60,7 @@ app.prepare().then(() => {
         const now = new Date();
         const options = { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false };
         const currentTimeStr = new Intl.DateTimeFormat('en-US', options).format(now); 
-        // Note: getDay() gives the day in local system time, which might be off. 
-        // We really should use the target timezone's day.
+        
         const currentDayStr = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(now);
         const daysMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
         const currentDay = daysMap[currentDayStr];
@@ -121,16 +90,16 @@ app.prepare().then(() => {
 
         if (targetChannel && process.env.SLACK_BOT_TOKEN) {
           // 1. Post Header
-          const headerText = config.slackMessageHeader || `📋 *Today's Task Assignments*`;
+          const headerText = config.slackMessageHeader || `:clipboard: *Today's Task Assignments*`;
           await slack.chat.postMessage({
             channel: targetChannel,
-            text: `🗓️ Daily Roster for ${fullDateStr}`,
+            text: `:calendar: Daily Roster for ${fullDateStr}`,
             blocks: [
               {
                 type: "header",
                 text: {
                   type: "plain_text",
-                  text: `🗓️ Daily Roster for ${fullDateStr}`,
+                  text: `📅 Daily Roster for ${fullDateStr}`,
                   emoji: true
                 }
               },
@@ -148,7 +117,7 @@ app.prepare().then(() => {
           const employeeTasks = {};
 
           for (const cat of activeCategories) {
-            const emoji = cat.icon || '📌';
+            const emoji = cat.icon || ':pushpin:';
             
             // Group for DMs
             for (const a of cat.assignments) {
@@ -180,7 +149,7 @@ app.prepare().then(() => {
                       type: "button",
                       text: {
                         type: "plain_text",
-                        text: "Acknowledge ✅",
+                        text: "Acknowledge",
                         emoji: true
                       },
                       value: `ack_${cat.id}`,
@@ -202,20 +171,20 @@ app.prepare().then(() => {
             const emp = employeeTasks[slackId];
             const todayBreak = (emp.breakSchedules || []).find(b => b.dayOfWeek === currentDay);
             if (todayBreak) {
-              breakLines.push(`• <@${slackId}>: ${fmtTimeGlobal(todayBreak.startTime)} – ${fmtTimeGlobal(todayBreak.endTime)}`);
+              breakLines.push(`• <@${slackId}>: ${fmtTimeGlobal(todayBreak.startTime)} to ${fmtTimeGlobal(todayBreak.endTime)}`);
             }
           }
 
           if (breakLines.length > 0) {
             await slack.chat.postMessage({
               channel: targetChannel,
-              text: "☕ Today's Break Schedule",
+              text: ":coffee: Today's Break Schedule",
               blocks: [
                 {
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: `*☕ Break Schedule*\n${breakLines.join('\n')}`
+                    text: `*:coffee: Break Schedule*\n${breakLines.join('\n')}`
                   }
                 }
               ]
@@ -229,18 +198,18 @@ app.prepare().then(() => {
             const taskLines = tasks.map((t) => `${t.emoji} *${t.catName}*${t.note ? `\n> _${t.note}_` : ''}`).join('\n\n');
             const todayBreak = (empSchedules || []).find(b => b.dayOfWeek === currentDay);
             const fmtTime = (t) => { const [h,m] = t.split(':').map(Number); return `${h%12||12}:${m.toString().padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
-            const breakLine = todayBreak ? `\n\n☕ *Break:* ${fmtTime(todayBreak.startTime)} – ${fmtTime(todayBreak.endTime)}` : '';
+            const breakLine = todayBreak ? `\n\n:coffee: *Break:* ${fmtTime(todayBreak.startTime)} to ${fmtTime(todayBreak.endTime)}` : '';
             
             try {
               await slack.chat.postMessage({
                 channel: slackId,
-                text: `📅 Your tasks for today`,
+                text: `:wave: Your tasks for today`,
                 blocks: [
                   {
                     type: "section",
                     text: {
                       type: "mrkdwn",
-                      text: `Good morning ${name.split(' ')[0]}! ☕\nHere are your assigned tasks for today:\n\n${taskLines}${breakLine}`
+                      text: `Good morning ${name.split(' ')[0]}! :wave:\nHere are your assigned tasks for today:\n\n${taskLines}${breakLine}`
                     }
                   }
                 ]
