@@ -26,19 +26,23 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f8fafc] text-slate-900 overflow-hidden`}>
         <div className="h-screen flex flex-col">
-          <header className="h-14 w-full flex items-center justify-between px-6 lg:px-8 shrink-0 z-50 bg-white/70 backdrop-blur-[20px] border-b border-black/[0.08]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-[7px] bg-gradient-to-b from-[#611f69] to-[#4A154B] flex items-center justify-center shadow-[0_2px_8px_rgba(74,21,75,0.3)] ring-1 ring-white/20 inset-0">
-                <svg className="w-[18px] h-[18px] text-white drop-shadow-sm" viewBox="0 0 24 24" fill="currentColor">
+          {/* Glowing Glassy Slack Emblem */}
+          <div className="absolute top-6 right-6 lg:right-8 z-[100] pointer-events-auto">
+            <div className="relative group cursor-pointer">
+              {/* Dynamic Multicolored Glow Aura */}
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-[#E01E5A] via-[#36C5F0] to-[#2EB67D] rounded-[18px] blur-md opacity-60 group-hover:opacity-100 transition duration-1000 animate-pulse"></div>
+              
+              {/* Dark Glassy Frosted Container */}
+              <div className="relative w-12 h-12 rounded-[14px] bg-[#2E0B2E]/60 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center overflow-hidden transition-transform duration-300 group-hover:scale-105">
+                {/* Diagonal Glass Glare */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
+                
+                <svg className="w-[26px] h-[26px] text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.4)]" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522-2.52h-6.313z"/>
                 </svg>
               </div>
-              <h1 className="font-semibold text-black text-[17px] tracking-[-0.41px]">Slack Roster</h1>
             </div>
-            
-            {/* Right side remains empty */}
-            <div></div>
-          </header>
+          </div>
           <main className="flex-1 w-full overflow-hidden flex">
             {children}
           </main>
