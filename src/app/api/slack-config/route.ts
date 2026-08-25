@@ -32,8 +32,8 @@ export async function GET() {
   try {
     const content = fs.readFileSync(ENV_PATH, 'utf-8');
     const vars = parseEnv(content);
-    // Mask tokens — return only last 6 chars so user can confirm which key is set
-    const mask = (v: string) => v ? '••••••••' + v.slice(-6) : '';
+    // Mask tokens -> return only last 6 chars so user can confirm which key is set
+    const mask = (v: string) => v ? '**********' + v.slice(-6) : '';
     return NextResponse.json({
       SLACK_BOT_TOKEN: mask(vars.SLACK_BOT_TOKEN || ''),
       SLACK_APP_TOKEN: mask(vars.SLACK_APP_TOKEN || ''),
@@ -56,10 +56,10 @@ export async function POST(request: Request) {
     const vars = parseEnv(content);
 
     // Only update fields that were actually provided and not the masked placeholder
-    if (body.SLACK_BOT_TOKEN && !body.SLACK_BOT_TOKEN.startsWith('••')) {
+    if (body.SLACK_BOT_TOKEN && !body.SLACK_BOT_TOKEN.startsWith('**********')) {
       vars.SLACK_BOT_TOKEN = body.SLACK_BOT_TOKEN.trim();
     }
-    if (body.SLACK_APP_TOKEN && !body.SLACK_APP_TOKEN.startsWith('••')) {
+    if (body.SLACK_APP_TOKEN && !body.SLACK_APP_TOKEN.startsWith('**********')) {
       vars.SLACK_APP_TOKEN = body.SLACK_APP_TOKEN.trim();
     }
     if (body.SLACK_CHANNEL_ID !== undefined) {
@@ -74,4 +74,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
-
