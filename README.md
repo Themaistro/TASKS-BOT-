@@ -1,65 +1,104 @@
-# Tradeling Task Bot
+# Slack Task Bot
 
-An automated scheduling and daily roster management system integrated directly with Slack via Socket Mode. It allows managers to visually drag and drop employees into tasks, set break schedules, and automatically publish a clean daily roster to Slack at 8:00 AM.
+A lightweight daily roster and scheduling application designed to make team task assignments a breeze. It provides managers with a visual drag-and-drop dashboard to organize daily tasks and breaks, and completely automates publishing the schedule directly to your team's Slack workspace every morning.
 
-## 🚀 Features
+## System Architecture
 
-- **Visual Roster Dashboard:** Next.js drag-and-drop interface to assign employees to daily tasks.
-- **Per-Day Break Scheduling:** Assign precise 5-minute increment breaks for employees based on the day of the week.
-- **Automated Slack Posting:** Background `node-cron` scheduler posts the roster every morning at 8:00 AM automatically.
-- **Individual Slack DMs:** Employees receive a private Direct Message with their specific task and break time.
-- **Socket Mode Integration:** Acknowledge buttons ("Acknowledge ✅") on the Slack messages update the web dashboard in real-time without requiring a public HTTPS endpoint.
-- **In-App Slack Configuration:** Safely update Slack API tokens directly from the web UI.
+Unlike standard Next.js applications, this project runs two processes simultaneously to bypass the need for a public HTTPS webhook endpoint:
+1. **Next.js Web UI:** Handles the drag-and-drop dashboard and REST APIs.
+2. **Background Node Worker:** Runs in the background within the same environment. It handles the `node-cron` scheduler for automated morning messages and maintains a persistent WebSocket connection to Slack (via Socket Mode) to instantly listen for button clicks (like the "Acknowledge" button).
 
-## 🛠️ Tech Stack
+## Key Features
 
-- **Frontend:** Next.js (App Router), React, Tailwind CSS, `@dnd-kit`
-- **Backend:** Node.js, `server.js` background worker, Next.js API Routes
-- **Database:** Prisma ORM, SQLite (easily swappable to PostgreSQL)
-- **Slack:** `@slack/socket-mode`, `@slack/web-api`
+- **Drag-and-Drop Dashboard:** A clean, intuitive interface for assigning team members to their daily tasks.
+- **Flexible Break Scheduling:** Set precise 5-minute break increments for everyone, customizable by the day of the week.
+- **Automated Slack Roster:** A background worker automatically drops the organized daily schedule right into your team's Slack channel every morning.
+- **Private DMs:** Team members get a personalized morning message with their exact tasks and break times so they know exactly what to do.
+- **Real-Time Slack Buttons:** When an employee clicks "Acknowledge" on the Slack message, the web dashboard updates instantly.
+- **Enterprise-Ready Security:** Built specifically so your DevOps team can safely inject Slack tokens through Docker without hardcoding any passwords.
 
-## 📦 Local Development Setup
+---
+
+## ⚙️ Environment Variables
+
+The application requires the following environment variables to function correctly. 
+
+| Variable | Required | Description |
+| :--- | :---: | :--- |
+| `SLACK_BOT_TOKEN` | **Yes** | Starts with `xoxb-`. Used by the bot to post messages and send DMs. |
+| `SLACK_APP_TOKEN` | **Yes** | Starts with `xapp-`. Used to establish the secure Socket Mode WebSocket connection. |
+| `SLACK_CHANNEL_ID` | **Yes** | The default Slack Channel ID (e.g., `C0BS4320V96`) where the morning roster is published. |
+| `DATABASE_URL` | No | Defaults to `file:./dev.db` for SQLite. Must be updated if migrating to PostgreSQL. |
+
+---
+
+## 🛠️ Slack App Configuration
+
+Before deploying, ensure your Slack App in the [Slack Developer Portal](https://api.slack.com/apps) is configured precisely with these settings:
+
+1. **Socket Mode:** Navigate to `Settings > Socket Mode` and toggle it **On**. (This generates your `SLACK_APP_TOKEN`).
+2. **OAuth & Permissions:** Add the following Bot Token Scopes:
+   - `chat:write` (To post the roster)
+   - `channels:read` (To find the target channel)
+   - `im:write` (To send private DMs to employees)
+   - `users:read` (To resolve Slack User IDs)
+3. **Event Subscriptions:** Toggle **On**. No Request URL is needed because Socket Mode handles the routing.
+4. **Interactivity & Shortcuts:** Toggle **On**. This allows the bot to listen to the "Acknowledge" button clicks on the roster.
+
+---
+
+## 💻 Local Development Setup
+
+Want to spin this up on your own machine to test it out?
 
 1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Environment Variables:**
-   Copy the example environment file and fill in your Slack credentials.
+2. **Set up your environment:**
+   Copy the example file and drop in your Slack API keys.
    ```bash
    cp .env.example .env
    ```
 
-3. **Initialize the Database:**
-   Generate the Prisma client and push the schema to create the SQLite file.
+3. **Prep the database:**
+   This will generate the Prisma client and create your local SQLite database file.
    ```bash
    npx prisma generate
    npx prisma db push
    ```
 
-4. **Start the Application:**
-   This starts both the Next.js dashboard and the background Slack Socket worker.
+4. **Start the application:**
+   This boots up both the web dashboard and the background worker that listens to Slack.
    ```bash
    npm run dev
    ```
+   *Then simply navigate to [http://localhost:3000](http://localhost:3000) in your browser!*
 
-5. **Open Dashboard:**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+---
 
-## 🚢 Production Deployment
+## 🚀 Production Deployment (Docker)
 
-For corporate deployments (AWS, Azure, GCP, or internal servers), a `Dockerfile` is included.
+If you are handing this project off to an IT or DevOps team, the repository includes a multi-stage `Dockerfile` optimized for production environments (AWS, Azure, GCP).
 
-### Using Docker
+### Step 1: Build the Image
+To build the Docker image locally, run this in your terminal:
 ```bash
-docker build -t tradeling-task-bot .
-docker run -p 3000:3000 -v /path/to/persistent/data:/app/prisma --env-file .env tradeling-task-bot
+docker build -t slack-task-bot .
 ```
-*(Note: Ensure `/app/prisma` is mounted as a persistent volume if continuing to use SQLite to prevent data loss on container restarts. Alternatively, change `provider = "sqlite"` to `"postgresql"` in `schema.prisma` and point `DATABASE_URL` to a managed DB).*
 
-### Slack App Requirements
-Ensure the Slack App in your workspace has the following configurations:
-- **Socket Mode:** Enabled
-- **Scopes:** `chat:write`, `channels:read`, `im:write`, `users:read`
-- **Events Subscriptions:** Enabled (Listening for `interactive` actions)
+### Step 2: Run the Container
+Because Docker containers start completely blank, the background worker requires the Slack tokens to be passed in at boot time so it can establish the WebSocket connection. 
+
+Run this command to automatically securely inject the required tokens directly from your local `.env` file:
+```bash
+docker run -p 3000:3000 --env-file .env slack-task-bot
+```
+
+### 🗄️ Database Migration Notes (For DevOps)
+Out of the box, this application uses **SQLite** for zero-config local development. If you are deploying this to a clustered production environment, you should swap to PostgreSQL to avoid database locking issues:
+1. Open `prisma/schema.prisma`.
+2. Change `provider = "sqlite"` to `provider = "postgresql"`.
+3. Provide a valid Postgres connection string in the `DATABASE_URL` environment variable.
+4. Run `npx prisma db push` against the new database.
