@@ -5,17 +5,17 @@ A lightweight daily roster and scheduling application designed to make team task
 ## System Architecture
 
 Unlike standard Next.js applications, this project runs two processes simultaneously to bypass the need for a public HTTPS webhook endpoint:
-1. **Next.js Web UI:** Handles the drag-and-drop dashboard and REST APIs.
+1. **Next.js Web UI:** Handles the drag-and-drop dashboard and REST APIs. Protected by Basic Authentication middleware.
 2. **Background Node Worker:** Runs in the background within the same environment. It handles the `node-cron` scheduler for automated morning messages and maintains a persistent WebSocket connection to Slack (via Socket Mode) to instantly listen for button clicks (like the "Acknowledge" button).
 
 ## Key Features
 
 - **Drag-and-Drop Dashboard:** A clean, intuitive interface for assigning team members to their daily tasks.
-- **Flexible Break Scheduling:** Set precise 5-minute break increments for everyone, customizable by the day of the week.
+- **Future & Past Planning:** The day-picker at the top of the dashboard allows you to configure repeating daily templates for any day of the week.
 - **Automated Slack Roster:** A background worker automatically drops the organized daily schedule right into your team's Slack channel every morning.
 - **Private DMs:** Team members get a personalized morning message with their exact tasks and break times so they know exactly what to do.
 - **Real-Time Slack Buttons:** When an employee clicks "Acknowledge" on the Slack message, the web dashboard updates instantly.
-- **Enterprise-Ready Security:** Built specifically so your DevOps team can safely inject Slack tokens through Docker without hardcoding any passwords.
+- **Enterprise-Ready Security:** Built specifically so your DevOps team can safely inject Slack tokens and Admin passwords through Docker Compose without hardcoding any credentials.
 
 ---
 
@@ -28,7 +28,8 @@ The application requires the following environment variables to function correct
 | `SLACK_BOT_TOKEN` | **Yes** | Starts with `xoxb-`. Used by the bot to post messages and send DMs. |
 | `SLACK_APP_TOKEN` | **Yes** | Starts with `xapp-`. Used to establish the secure Socket Mode WebSocket connection. |
 | `SLACK_CHANNEL_ID` | **Yes** | The default Slack Channel ID (e.g., `C0BS4320V96`) where the morning roster is published. |
-| `DATABASE_URL` | No | Defaults to `file:./dev.db` for SQLite. Must be updated if migrating to PostgreSQL. |
+| `ADMIN_PASSWORD` | **Yes** | Secures the web dashboard behind a Basic Auth login prompt. |
+| `DATABASE_URL` | **Yes** | Connection string for PostgreSQL (automatically configured in `docker-compose.yml`). |
 
 ---
 
@@ -47,58 +48,34 @@ Before deploying, ensure your Slack App in the [Slack Developer Portal](https://
 
 ---
 
-## 💻 Local Development Setup
+## 💻 Local Development Setup (PostgreSQL Required)
 
-Want to spin this up on your own machine to test it out?
+Because this application uses PostgreSQL for robust data integrity, the easiest way to run it locally is using Docker Compose.
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Set up your environment:**
-   Copy the example file and drop in your Slack API keys.
+1. **Set up your environment:**
+   Copy the example file and drop in your Slack API keys and an Admin Password.
    ```bash
    cp .env.example .env
    ```
 
-3. **Prep the database:**
-   This will generate the Prisma client and create your local SQLite database file.
+2. **Spin up the stack:**
+   This command builds the Next.js app and automatically provisions a linked PostgreSQL database container.
    ```bash
-   npx prisma generate
-   npx prisma db push
+   docker-compose up -d --build
    ```
 
-4. **Start the application:**
-   This boots up both the web dashboard and the background worker that listens to Slack.
-   ```bash
-   npm run dev
-   ```
-   *Then simply navigate to [http://localhost:3000](http://localhost:3000) in your browser!*
+3. **Open the Dashboard:**
+   Navigate to [http://localhost:3000](http://localhost:3000). You will be prompted to enter the `ADMIN_PASSWORD` you set in your `.env` file.
 
 ---
 
-## 🚀 Production Deployment (Docker)
+## 🚀 Production Deployment (IT / DevOps)
 
-If you are handing this project off to an IT or DevOps team, the repository includes a multi-stage `Dockerfile` optimized for production environments (AWS, Azure, GCP).
+This repository includes a production-ready `docker-compose.yml` file that orchestrates the Next.js container alongside a `postgres:15-alpine` database.
 
-### Step 1: Build the Image
-To build the Docker image locally, run this in your terminal:
-```bash
-docker build -t slack-task-bot .
-```
-
-### Step 2: Run the Container
-Because Docker containers start completely blank, the background worker requires the Slack tokens to be passed in at boot time so it can establish the WebSocket connection. 
-
-Run this command to automatically securely inject the required tokens directly from your local `.env` file:
-```bash
-docker run -p 3000:3000 --env-file .env slack-task-bot
-```
-
-### 🗄️ Database Migration Notes (For DevOps)
-Out of the box, this application uses **SQLite** for zero-config local development. If you are deploying this to a clustered production environment, you should swap to PostgreSQL to avoid database locking issues:
-1. Open `prisma/schema.prisma`.
-2. Change `provider = "sqlite"` to `provider = "postgresql"`.
-3. Provide a valid Postgres connection string in the `DATABASE_URL` environment variable.
-4. Run `npx prisma db push` against the new database.
+1. Ensure the `.env` file is populated with production Slack credentials and a secure `ADMIN_PASSWORD`.
+2. Deploy the stack:
+   ```bash
+   docker-compose up -d
+   ```
+*(Note: The database tables are automatically migrated via `npx prisma db push` every time the Next.js container starts, ensuring the schema stays in sync.)*
