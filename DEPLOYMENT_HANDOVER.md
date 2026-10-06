@@ -1,94 +1,77 @@
-# Task Bot — Deployment Handover
+# Notes for deployment
 
-## Current status
+The Task Bot is working locally and is ready for the technical team to take over. The main features are already built: weekly schedules, assignments, notes, breaks, days off, Slack posts, private messages, automatic posting, and acknowledgement buttons.
 
-The application is feature-complete for local team testing and passes a production build. The dashboard, roster management, notes, days off, breaks, manual Slack posting, scheduled posting, DMs, and acknowledgement handling have been implemented.
+What is still needed is the production setup.
 
-It still requires production infrastructure and security work before it is exposed on a company domain.
+## Hosting
 
-## Recommended deployment architecture
+The bot needs an always-running Node.js service and a PostgreSQL database. It cannot use serverless-only hosting because the Slack connection and daily scheduler need to stay active.
 
-- One always-on Node.js service running `npm start`
-- Managed PostgreSQL database with backups
-- HTTPS custom domain behind the hosting provider or reverse proxy
-- Provider-managed environment variables/secrets
-- Health check: `GET /api/health`
+The hosting setup should include:
 
-Railway, Render with an always-on paid service, a company Kubernetes environment, or a small managed VPS can run this architecture. Serverless-only hosting is not suitable because `server.js` maintains a cron scheduler and Slack Socket Mode WebSocket connection.
+- One Node.js service running `npm start`
+- A managed PostgreSQL database
+- HTTPS and the company domain
+- Environment variables stored in the hosting platform
+- Monitoring for `/api/health`
 
-## Deployment procedure
+Railway, a paid always-on Render service, our company infrastructure, or a small VPS should all work.
 
-1. Provision PostgreSQL and obtain `DATABASE_URL`.
-2. Add all variables from `.env.example` to the hosting provider's secret manager.
-3. Set a unique, strong `ADMIN_PASSWORD`; do not deploy with `admin` / `admin`.
-4. Rotate the Slack bot and app tokens before launch, then add the new values as secrets.
-5. Build the container using the included `Dockerfile`.
-6. Start the service. The container currently runs `npx prisma db push && npm start`.
-7. Configure HTTPS and the company domain.
-8. Confirm that the service remains continuously running and does not sleep.
-9. Invite the Slack bot to the roster channel.
-10. Complete the acceptance checks below.
+## Environment variables
 
-## Important production work
+Use `.env.example` as the reference. The production environment needs:
 
-### 1. Slack settings persistence
+- `DATABASE_URL`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `SLACK_BOT_TOKEN`
+- `SLACK_APP_TOKEN`
+- `SLACK_CHANNEL_ID`
 
-The current Settings screen writes Slack credentials to the local `.env` file. This works locally but is not reliable on hosts with immutable or ephemeral filesystems. For production, choose one of these approaches:
+Please use a strong admin password. The current `admin` / `admin` login is only for local testing.
 
-- Preferred: manage Slack tokens only in the hosting provider's secret manager and make the token fields read-only/hidden in the dashboard.
-- Alternative: store encrypted credentials in PostgreSQL using a separate encryption key supplied by the host.
+The Slack tokens used during development should be revoked and replaced before launch because they were shared while we were testing.
 
-Do not store unencrypted production Slack tokens in normal database columns.
+## Slack setup
 
-### 2. Authentication hardening
+Please check the following in the Slack app:
 
-The current application uses a simple single-admin cookie intended for local testing. Before public exposure, replace it with a signed server-side session and rate-limit login attempts. The tech team may also place the application behind company SSO, VPN, or an identity-aware proxy.
+- Socket Mode is enabled
+- The app token has `connections:write`
+- Interactivity is enabled
+- Bot scopes include `chat:write`, `channels:read`, `groups:read`, `users:read`, and `im:write`
+- The app is reinstalled after any scope changes
+- The bot is invited to the roster channel
+- Each team member has the correct Slack member ID in the dashboard
 
-Review the middleware matcher as part of this work and ensure every administrative API route requires authentication.
+## A few things to improve before launch
 
-### 3. Database migrations and backups
+The Slack settings page currently saves tokens to the local `.env` file. That works locally, but it may not survive a hosted redeployment. For production, the tokens should either be managed through the hosting platform or stored encrypted in PostgreSQL.
 
-The Docker image currently uses `prisma db push` on startup. For controlled production releases, create and commit Prisma migrations and use `prisma migrate deploy`. Enable automated database backups and test restoration.
+The current login is suitable for one local admin. Before the dashboard is made public, please replace the simple session cookie with a signed session and add rate limiting. Company SSO or access through the company VPN would also be suitable.
 
-### 4. Operational reliability
+The container currently runs `prisma db push` when it starts. It would be better to create proper Prisma migration files and use `prisma migrate deploy` for production releases. Database backups should also be enabled.
 
-- Run exactly one scheduler instance, or add a distributed lock if multiple replicas are required.
-- Add structured logs and provider alerts for failed Slack posts or Socket Mode disconnects.
-- Add a restart policy and uptime monitoring for `/api/health`.
-- Confirm the configured timezone and daylight-saving behavior.
+Only one copy of the scheduler should run. If the service is scaled to more than one instance later, it will need a locking mechanism to prevent duplicate Slack posts.
 
-## Slack app checklist
+## Final test after deployment
 
-- Socket Mode: enabled
-- App token scope: `connections:write`
-- Interactivity: enabled
-- Bot scopes: `chat:write`, `channels:read`, `groups:read`, `users:read`, `im:write`
-- App reinstalled after scope changes
-- Bot invited to the target public or private channel
-- Team members entered with correct Slack member IDs
+1. Sign in with the production admin account.
+2. Add a test category and team member.
+3. Assign the member, add a note, and set a break.
+4. Mark the member off on another day and confirm they cannot be assigned or given a break that day.
+5. Use **Push to Slack Now** and check the channel post and private message.
+6. Click **Acknowledge** in Slack and confirm the channel message updates without an error.
+7. Set an automatic post a few minutes ahead and confirm it posts once.
+8. Restart the service and confirm the roster is still there.
+9. Redeploy once and confirm the database and secrets stay connected.
+10. Check the logs for repeated database or Slack errors.
 
-## Acceptance test
+## Maintenance notes
 
-1. Sign in using the production admin credentials.
-2. Create a test category and test team member.
-3. Assign the member, add a note, configure a break, and save.
-4. Mark the member off on another day and verify they cannot be assigned or given a break that day.
-5. Select **Push to Slack Now** and verify the channel roster and personal DM.
-6. Select **Acknowledge** in Slack and verify the message updates without an error indicator.
-7. Configure an automated post a few minutes ahead and verify it posts once.
-8. Restart the service and verify all database-backed roster data remains.
-9. Redeploy the service and verify secrets and database data remain available.
-10. Review logs to confirm there are no recurring database or Slack connection errors.
+The project is currently using Next.js 16.3.8 and the production build passes.
 
-## Files that must never be committed
+The dependency audit still reports an issue through Prisma's configuration tooling. The suggested automatic fix changes the Prisma version, so this should be handled as a tested dependency update instead of applying the forced fix directly.
 
-- `.env` and other real environment files
-- `*.db` local databases
-- Slack tokens, passwords, or OAuth secrets
-- PostgreSQL backups containing company data
-
-## Known build note
-
-Next.js reports that the middleware filename convention is deprecated in favor of the newer proxy convention. The current build succeeds; this warning can be handled during a future framework maintenance update.
-
-The final production audit no longer reports the critical Next.js advisory after upgrading to Next.js 16.3.8. It still reports a high-severity `deepmerge-ts` advisory through Prisma's configuration tooling. The automated recommendation is a breaking Prisma version change, so the deployment team should review and test a Prisma upgrade separately before launch.
+Next.js also shows a warning about moving from the middleware filename convention to the newer proxy convention. It does not stop the current build, so this can be handled during a future framework update.
