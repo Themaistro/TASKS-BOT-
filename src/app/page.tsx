@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Users, LayoutList, Calendar as CalendarIcon, Trash2, Send, Clock, UserPlus, Check, Copy, GripVertical, AlertCircle, Info, Loader2, ChevronDown, EyeOff, Settings, Eye, X as XIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Users, LayoutList, Calendar as CalendarIcon, Trash2, Send, Clock, UserPlus, Check, Copy, GripVertical, AlertCircle, Info, Loader2, ChevronDown, EyeOff, Settings, Eye, X as XIcon, LogOut } from 'lucide-react';
 import { DndContext, closestCenter, DragOverlay, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableCategory, DroppableCategoryCard, DraggableAssignment, DraggableEmployee, AssignmentCardUI } from './dnd-components';
@@ -31,13 +32,14 @@ const getAvatarColor = (name: string) => {
 };
 
 export default function Dashboard() {
+  const router = useRouter();
   const [activeDay, setActiveDay] = useState(new Date().getDay() === 0 ? 0 : new Date().getDay());
   const [postTime, setPostTime] = useState('08:00');
   const [isAutoActive, setIsAutoActive] = useState(true);
   const [timezone, setTimezone] = useState('Asia/Dubai');
   const [slackChannel, setSlackChannel] = useState('');
   const [slackMessageHeader, setSlackMessageHeader] = useState("🚀 *Today's Task Assignments*");
-  const [workingDays, setWorkingDays] = useState("1,2,3,4,5");
+  const [workingDays, setWorkingDays] = useState("0,1,2,3,4,5,6");
   const [timeUntilNext, setTimeUntilNext] = useState('');
   const [isAutomationExpanded, setIsAutomationExpanded] = useState(false);
   
@@ -84,6 +86,11 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  const logout = async () => {
+    await fetch('/api/auth', { method: 'DELETE' });
+    router.replace('/login');
+  };
+
   // Slack settings modal
   const [showSettings, setShowSettings] = useState(false);
   const [slackCfg, setSlackCfg] = useState({ SLACK_BOT_TOKEN: '', SLACK_APP_TOKEN: '', SLACK_CHANNEL_ID: '' });
@@ -92,6 +99,8 @@ export default function Dashboard() {
   const [cfgSaving, setCfgSaving] = useState(false);
   const [cfgMsg, setCfgMsg] = useState<{ text: string; type: 'success' | 'warn' | 'error' } | null>(null);
   const [dbConfig, setDbConfig] = useState<any>({});
+  const [slackStatus, setSlackStatus] = useState<{ connected: boolean; teamName?: string | null; hasChannel: boolean }>({ connected: false, hasChannel: false });
+  const [slackChannels, setSlackChannels] = useState<{ id: string; name?: string; is_member?: boolean }[]>([]);
 
   const showToast = (message: string) => {
     setToast({ message, show: true });
@@ -103,12 +112,20 @@ export default function Dashboard() {
     setShowBotToken(false);
     setShowAppToken(false);
     try {
-      const res = await fetch('/api/slack-config');
-      const data = await res.json();
+      const configRes = await fetch('/api/slack-config');
+      const data = await configRes.json();
+      try {
+        const status = await (await fetch('/api/slack/status')).json();
+        setSlackStatus(status);
+        if (status.connected) {
+          const channelsRes = await fetch('/api/slack/channels');
+          if (channelsRes.ok) setSlackChannels((await channelsRes.json()).channels || []);
+        }
+      } catch { setSlackStatus({ connected: false, hasChannel: Boolean(data.SLACK_CHANNEL_ID) }); }
       setSlackCfg({
-        SLACK_BOT_TOKEN: data.SLACK_BOT_TOKEN || '',
-        SLACK_APP_TOKEN: data.SLACK_APP_TOKEN || '',
-        SLACK_CHANNEL_ID: data.SLACK_CHANNEL_ID || '',
+        SLACK_BOT_TOKEN: data.SLACK_BOT_TOKEN || slackCfg.SLACK_BOT_TOKEN || '',
+        SLACK_APP_TOKEN: data.SLACK_APP_TOKEN || slackCfg.SLACK_APP_TOKEN || '',
+        SLACK_CHANNEL_ID: data.SLACK_CHANNEL_ID || slackCfg.SLACK_CHANNEL_ID || '',
       });
     } catch {
       setSlackCfg({ SLACK_BOT_TOKEN: '', SLACK_APP_TOKEN: '', SLACK_CHANNEL_ID: '' });
@@ -125,12 +142,13 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(slackCfg),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: `Server returned HTTP ${res.status}` }));
       if (!res.ok) throw new Error(data.error || 'Failed to save');
-      setCfgMsg(data.needsRestart
-        ? { text: '✅ Saved! Restart the server for token changes to take effect.', type: 'warn' }
-        : { text: '✅ Channel ID saved successfully.', type: 'success' }
-      );
+      if (slackCfg.SLACK_CHANNEL_ID) {
+        const channelRes = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slackChannel: slackCfg.SLACK_CHANNEL_ID }) });
+        if (!channelRes.ok) throw new Error('Channel could not be saved to the database');
+      }
+      setCfgMsg({ text: '✅ Slack settings saved successfully.', type: 'success' });
     } catch (e: any) {
       setCfgMsg({ text: `❌ ${e.message}`, type: 'error' });
     } finally {
@@ -337,9 +355,20 @@ export default function Dashboard() {
 
   const toggleLeave = async (emp: Employee, dayNum: number) => {
     let leaves = JSON.parse(emp.onLeaveDays || '[]');
-    if (leaves.includes(dayNum)) leaves = leaves.filter((d: number) => d !== dayNum);
+    const wasOff = leaves.includes(dayNum);
+    if (wasOff) leaves = leaves.filter((d: number) => d !== dayNum);
     else leaves.push(dayNum);
     setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, onLeaveDays: JSON.stringify(leaves) } : e));
+    if (!wasOff && breakSchedules.some(b => b.employeeId === emp.id && b.dayOfWeek === dayNum)) {
+      await removeBreakSchedule(emp.id, dayNum);
+    }
+    if (!wasOff) {
+      const dayAssignments = assignments.filter(a => a.employeeId === emp.id && a.dayOfWeek === dayNum);
+      if (dayAssignments.length) {
+        await Promise.all(dayAssignments.map(a => fetch(`/api/assignments/${a.id}`, { method: 'DELETE' })));
+        setAssignments(prev => prev.filter(a => !(a.employeeId === emp.id && a.dayOfWeek === dayNum)));
+      }
+    }
     await fetch(`/api/employees/${emp.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ onLeaveDays: JSON.stringify(leaves) })
@@ -383,6 +412,11 @@ export default function Dashboard() {
 
   const addAssignment = async (categoryId: string) => {
     if (!selectedEmp) return;
+    const employee = employees.find(e => e.id === selectedEmp);
+    if (employee && isOnLeave(employee, activeDay)) {
+      showAlert('Unavailable', `${employee.name} is marked off for this day and cannot be assigned.`);
+      return;
+    }
     await fetch('/api/assignments', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dayOfWeek: activeDay, categoryId, employeeId: selectedEmp, note })
@@ -410,12 +444,24 @@ export default function Dashboard() {
   };
 
   const saveEditedNote = async (id: string) => {
-    await fetch(`/api/assignments/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note: editNoteVal })
-    });
+    const nextNote = editNoteVal.trim();
+    const previousNote = assignments.find(a => a.id === id)?.note ?? '';
+
+    // Keep the new text visible while it is saved so the row never flashes
+    // back to the previous server value.
+    setAssignments(prev => prev.map(a => a.id === id ? { ...a, note: nextNote || null } : a));
     setEditNoteId(null);
-    fetchData();
+
+    try {
+      const response = await fetch(`/api/assignments/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: nextNote })
+      });
+      if (!response.ok) throw new Error('Unable to save note');
+    } catch {
+      setAssignments(prev => prev.map(a => a.id === id ? { ...a, note: previousNote || null } : a));
+      showAlert('Note not saved', 'The note could not be saved. Please check the connection and try again.');
+    }
   };
 
   const testBot = async () => {
@@ -428,7 +474,7 @@ export default function Dashboard() {
       if (data.success) {
         showAlert('Success', `Successfully posted ${DAYS.find(d => d.val === activeDay)?.label}'s Roster to Slack!`);
       } else {
-        showAlert('Error', 'Failed to push to Slack: ' + data.error);
+        showAlert('Error', data.error ? `Slack error: ${data.error}` : `Slack request failed (HTTP ${res.status}).`);
       }
     } catch (e) {
       setToast({ show: false, message: '' });
@@ -471,6 +517,11 @@ export default function Dashboard() {
     if (String(active.id).startsWith('emp-')) {
       const employeeId = String(active.id).replace('emp-', '');
       const targetCategoryId = String(over.id).replace('drop-', '');
+      const employee = employees.find(emp => emp.id === employeeId);
+      if (employee && isOnLeave(employee, activeDay)) {
+        showAlert('Unavailable', `${employee.name} is marked off for this day and cannot be assigned.`);
+        return;
+      }
       
       const res = await fetch('/api/assignments', {
         method: 'POST',
@@ -530,6 +581,9 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleGlobalDragStart} onDragEnd={handleGlobalDragEnd}>
       <div className="flex flex-col lg:flex-row gap-6 h-full w-full p-4 md:p-6 lg:p-8 relative">
+      <button onClick={logout} className="absolute top-6 right-20 z-50 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm hover:border-red-200 hover:text-red-600" title="Sign out">
+        <LogOut className="h-4 w-4" /> Sign out
+      </button>
       {/* Sidebar Toggle Button */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -596,7 +650,8 @@ export default function Dashboard() {
                 let h24 = parseInt(h12);
                 if (ap === 'PM' && h24 !== 12) h24 += 12;
                 if (ap === 'AM' && h24 === 12) h24 = 0;
-                const str = `${h24.toString().padStart(2, '0')}:${m}`;
+                const minute = Math.min(59, Math.max(0, parseInt(m || '0')));
+                const str = `${h24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                 setPostTime(str);
               };
 
@@ -604,13 +659,11 @@ export default function Dashboard() {
                 <div className="bg-[#4A154B] border border-[#5c1a63] rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-sm">
                   <span className="text-xs uppercase font-black tracking-widest text-purple-100">Time</span>
                   <div className="flex items-center gap-2">
-                    <select value={currentH12.toString()} onChange={e => updateTime(e.target.value, currentM, ampm)} className="appearance-none bg-[#3F0E40] text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
+                    <select value={currentH12.toString()} onChange={e => updateTime(e.target.value, currentM, ampm)} className="appearance-none w-16 h-10 bg-[#3F0E40] text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
                       {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
                     </select>
                     <span className="text-purple-300 font-extrabold text-xl">:</span>
-                    <select value={currentM} onChange={e => updateTime(currentH12.toString(), e.target.value, ampm)} className="appearance-none bg-[#3F0E40] text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center cursor-pointer hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50">
-                      {['00','15','30','45'].map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={currentM} onFocus={e => e.currentTarget.select()} onChange={e => { const value = e.target.value.replace(/\D/g, '').slice(0, 2); if (value !== '') updateTime(currentH12.toString(), value, ampm); }} aria-label="Minutes" className="w-16 h-10 bg-[#3F0E40] text-white px-3 py-2 text-sm font-bold outline-none font-mono text-center hover:bg-slate-600 rounded-lg transition-colors shadow-inner border border-slate-600/50" />
                     <div className="flex bg-[#3F0E40] rounded-lg p-1 ml-auto shadow-inner border border-slate-600/50">
                       <button onClick={() => updateTime(currentH12.toString(), currentM, 'AM')} className={`text-[10px] font-extrabold px-3 py-1.5 rounded-md transition-colors ${ampm === 'AM' ? 'bg-emerald-500 text-white shadow' : 'text-purple-200 hover:text-white'}`}>AM</button>
                       <button onClick={() => updateTime(currentH12.toString(), currentM, 'PM')} className={`text-[10px] font-extrabold px-3 py-1.5 rounded-md transition-colors ${ampm === 'PM' ? 'bg-emerald-500 text-white shadow' : 'text-purple-200 hover:text-white'}`}>PM</button>
@@ -838,11 +891,14 @@ export default function Dashboard() {
                             {DAYS.map(d => {
                               const sched = breakSchedules.find(b => b.employeeId === emp.id && b.dayOfWeek === d.val);
                               const isOpen = breakPicker?.empId === emp.id && breakPicker?.day === d.val;
+                              const isLeaveDay = isOnLeave(emp, d.val);
                               return (
                                 <div key={d.val}>
                                   <button
+                                    disabled={isLeaveDay}
+                                    title={isLeaveDay ? `${emp.name} is off on ${d.label}` : undefined}
                                     onClick={(e) => isOpen ? setBreakPicker(null) : openBreakPicker(emp.id, d.val, e.currentTarget)}
-                                    className={`text-[10px] px-2 py-1.5 rounded-md font-bold transition transform active:scale-95 flex flex-col items-center leading-tight ${sched ? 'bg-orange-500 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600'}`}
+                                    className={`text-[10px] px-2 py-1.5 rounded-md font-bold transition flex flex-col items-center leading-tight ${isLeaveDay ? 'bg-slate-100 border border-slate-200 text-slate-300 cursor-not-allowed' : sched ? 'bg-orange-500 text-white shadow-md active:scale-95' : 'bg-white border border-slate-200 text-slate-500 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 active:scale-95'}`}
                                   >
                                     <span>{d.label.slice(0,3)}</span>
                                     {sched && <span className="text-[8px] opacity-80">{formatBreakTime(sched.startTime)}</span>}
@@ -982,7 +1038,7 @@ export default function Dashboard() {
                               <div className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-inner mt-1">
                                 <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white flex-1 outline-none font-medium text-slate-700">
                                   <option value="">Select teammate...</option>
-                                  {employees.map(e => { const absent = isOnLeave(e, activeDay); return <option key={e.id} value={e.id} disabled={absent}>{absent ? `[OFF] ` : ''}{e.name}</option>; })}
+                                  {employees.filter(e => !isOnLeave(e, activeDay)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                                 </select>
                                 <input type="text" placeholder="Note (Enter to save)" value={note} onChange={e => setNote(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') addAssignment(cat.id); }} className="border border-slate-200 rounded-lg px-3 py-2 text-xs flex-1 outline-none shadow-sm" />
                                 <div className="flex gap-2 w-full sm:w-auto">
@@ -1072,9 +1128,9 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4" onClick={() => setShowSettings(false)}>
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
 
-          <div className="relative w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="relative w-full max-w-lg max-h-[calc(100vh-2rem)]" onClick={e => e.stopPropagation()}>
             {/* Card */}
-            <div className="bg-white rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.25)] overflow-hidden border border-slate-200/80">
+            <div className="bg-white rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.25)] overflow-y-auto max-h-[calc(100vh-2rem)] border border-slate-200/80">
 
               {/* ── Hero Header ── */}
               <div className="relative px-7 pt-7 pb-6 bg-gradient-to-br from-[#4A154B] via-[#611f69] to-[#7c2d8e] overflow-hidden">
@@ -1103,8 +1159,8 @@ export default function Dashboard() {
                 {/* Status chips */}
                 <div className="relative flex gap-2 mt-5">
                   {[
-                    { label: 'Bot Token', set: slackCfg.SLACK_BOT_TOKEN.startsWith('••') || slackCfg.SLACK_BOT_TOKEN.length > 0 },
-                    { label: 'App Token', set: slackCfg.SLACK_APP_TOKEN.startsWith('••') || slackCfg.SLACK_APP_TOKEN.length > 0 },
+                    { label: 'Bot Token', set: !!slackCfg.SLACK_BOT_TOKEN },
+                    { label: 'App Token', set: !!slackCfg.SLACK_APP_TOKEN },
                     { label: 'Channel', set: !!slackCfg.SLACK_CHANNEL_ID },
                   ].map(chip => (
                     <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${chip.set ? 'bg-emerald-400/20 border-emerald-400/40 text-emerald-200' : 'bg-white/10 border-white/20 text-white/50'}`}>
@@ -1113,10 +1169,22 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+                {slackStatus.connected && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[11px] text-emerald-800"><strong>Connected to {slackStatus.teamName || 'Slack'}</strong><br />Tokens are managed securely by the installation. You do not need to paste them.</div>}
               </div>
 
               {/* ── Fields ── */}
               <div className="px-7 py-6 space-y-5">
+
+                {/* ── Guided installation ── */}
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-5">
+                  <h3 className="text-sm font-extrabold tracking-tight text-indigo-950">Connect your Slack workspace</h3>
+                  <ol className="mt-3 space-y-2.5 text-[11px] leading-4 text-indigo-900/75">
+                    <li><strong>1.</strong> Create or open your Slack app at <strong>api.slack.com/apps</strong>.</li>
+                    <li><strong>2.</strong> Copy the Bot Token and App Token into the fields below.</li>
+                    <li><strong>3.</strong> Enter the channel ID where rosters should be posted.</li>
+                  </ol>
+                  <p className="mt-3 border-t border-indigo-200/70 pt-3 text-[10px] text-indigo-800/70">Slack credentials are masked by default. Select the visibility icon only when you need to verify a saved token.</p>
+                </div>
 
                 {/* Bot Token */}
                 <div className="space-y-1.5">
@@ -1130,7 +1198,7 @@ export default function Dashboard() {
                         type={showBotToken ? 'text' : 'password'}
                         value={slackCfg.SLACK_BOT_TOKEN}
                         onChange={e => setSlackCfg(p => ({ ...p, SLACK_BOT_TOKEN: e.target.value }))}
-                        placeholder="Paste your bot token here"
+                        placeholder={slackCfg.SLACK_BOT_TOKEN.startsWith('**********') ? 'Bot token saved (hidden)' : 'Paste your bot token here'}
                         className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-[13px] font-mono text-slate-700 outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 bg-slate-50/70 placeholder:text-slate-300 transition"
                       />
                     </div>
@@ -1155,7 +1223,7 @@ export default function Dashboard() {
                         type={showAppToken ? 'text' : 'password'}
                         value={slackCfg.SLACK_APP_TOKEN}
                         onChange={e => setSlackCfg(p => ({ ...p, SLACK_APP_TOKEN: e.target.value }))}
-                        placeholder="Paste your app-level token here"
+                        placeholder={slackCfg.SLACK_APP_TOKEN.startsWith('**********') ? 'App token saved (hidden)' : 'Paste your app-level token here'}
                         className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-[13px] font-mono text-slate-700 outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 bg-slate-50/70 placeholder:text-slate-300 transition"
                       />
                     </div>
@@ -1181,7 +1249,8 @@ export default function Dashboard() {
                     placeholder="e.g. C0BS4320V96"
                     className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-[13px] font-mono text-slate-700 outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 bg-slate-50/70 placeholder:text-slate-300 transition"
                   />
-                  <p className="text-[10px] text-slate-400">Right-click a channel in Slack → <span className="font-semibold">Copy link</span> → the ID is the last part of the URL</p>
+                  {slackChannels.length > 0 && <select value={slackCfg.SLACK_CHANNEL_ID} onChange={e => setSlackCfg(p => ({ ...p, SLACK_CHANNEL_ID: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-[13px] text-slate-700 bg-slate-50/70"><option value="">Choose a connected channel…</option>{slackChannels.map(channel => <option key={channel.id} value={channel.id}>#{channel.name}{channel.is_member ? ' (bot is a member)' : ''}</option>)}</select>}
+                  <p className="text-[10px] text-slate-400">Copy the channel ID from Slack. It usually starts with C.</p>
                 </div>
 
                 {/* Restart notice */}
@@ -1190,8 +1259,8 @@ export default function Dashboard() {
                     <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-amber-800">Server restart required for tokens</p>
-                    <p className="text-[10px] text-amber-600 mt-0.5">Channel ID updates take effect immediately. Token changes need a full server restart.</p>
+                    <p className="text-[11px] font-bold text-amber-800">Configuration updates take effect immediately</p>
+                    <p className="text-[10px] text-amber-600 mt-0.5">After saving your changes, select <strong>Push to Slack Now</strong> to verify the connection.</p>
                   </div>
                 </div>
 

@@ -56,5 +56,15 @@ model Config {
   timezone           String  @default("Asia/Dubai")
   slackChannel       String  @default("")
   slackMessageHeader String  @default("🚀 *Today's Task Assignments*")
-  workingDays        String  @default("1,2,3,4,5") // Comma-separated days 0=Sun, 1=Mon, etc.
+  workingDays        String  @default("0,1,2,3,4,5,6") // Comma-separated days 0=Sun, 1=Mon, etc.
+}
+
+model SlackInstallation {
+  id          String   @id @default("global")
+  teamId      String   @unique
+  teamName    String
+  botToken    String
+  scopes      String   @default("")
+  installedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

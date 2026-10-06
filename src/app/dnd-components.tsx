@@ -104,9 +104,10 @@ interface AssignmentProps {
   getInitials: (name: string) => string;
   isOverlay?: boolean;
   breakSchedules?: BreakSchedule[];
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
-export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNoteVal, setEditNoteVal, saveEditedNote, removeAssignment, getAvatarColor, getInitials, isOverlay = false, breakSchedules = [] }: AssignmentProps) {
+export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNoteVal, setEditNoteVal, saveEditedNote, removeAssignment, getAvatarColor, getInitials, isOverlay = false, breakSchedules = [], dragHandleProps }: AssignmentProps) {
   const dayBreak = breakSchedules.find(b => b.employeeId === a.employee?.id && b.dayOfWeek === a.dayOfWeek);
   
   const formatBreakTime = (time: string) => {
@@ -116,7 +117,11 @@ export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNot
 
   return (
     <div className={`border rounded-xl text-xs flex items-stretch group transition-all overflow-hidden bg-white ${absent ? 'border-red-300 ring-1 ring-red-400' : 'border-slate-200'} ${isOverlay ? 'shadow-2xl scale-[1.03] ring-2 ring-indigo-500/50 cursor-grabbing' : 'shadow-sm hover:shadow-md hover:border-indigo-300'}`}>
-      <div className={`px-2 flex items-center border-r ${absent ? 'bg-red-50 text-red-400 border-red-200' : 'bg-slate-50 text-slate-300 group-hover:text-indigo-400 group-hover:bg-indigo-50 border-slate-100 transition-colors'}`}>
+      <div
+        {...dragHandleProps}
+        className={`px-2 flex items-center border-r touch-none ${isOverlay ? 'cursor-grabbing' : 'cursor-grab active:cursor-grabbing'} ${absent ? 'bg-red-50 text-red-400 border-red-200' : 'bg-slate-50 text-slate-300 group-hover:text-indigo-400 group-hover:bg-indigo-50 border-slate-100 transition-colors'}`}
+        title={isOverlay ? undefined : 'Drag assignment'}
+      >
         <GripVertical className="w-3.5 h-3.5" />
       </div>
 
@@ -138,12 +143,12 @@ export function AssignmentCardUI({ a, absent, editNoteId, setEditNoteId, editNot
       
       {editNoteId === a.id && !isOverlay ? (
         <div className={`flex items-center flex-1 ${absent ? 'bg-red-50' : 'bg-amber-50/30'}`}>
-          <input autoFocus className={`text-[11px] w-full px-3 py-2 outline-none bg-transparent font-medium ${absent ? 'text-red-900 placeholder:text-red-300' : 'text-slate-700 placeholder:text-slate-300'}`} placeholder="Type note..." value={editNoteVal} onChange={e => setEditNoteVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEditedNote(a.id); }} onBlur={() => saveEditedNote(a.id)} />
+          <input autoFocus className={`text-[11px] w-full px-3 py-2 outline-none bg-transparent font-medium ${absent ? 'text-red-900 placeholder:text-red-300' : 'text-slate-700 placeholder:text-slate-300'}`} placeholder="Type a note, then press Enter" value={editNoteVal} onChange={e => setEditNoteVal(e.target.value)} onPointerDown={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEditedNote(a.id); } if (e.key === 'Escape') setEditNoteId(null); }} onBlur={() => saveEditedNote(a.id)} />
         </div>
       ) : (
-        <div onPointerDown={(e) => { if(!isOverlay) { e.stopPropagation(); setEditNoteId(a.id); setEditNoteVal(a.note || ''); } }} className={`px-3 py-2 flex items-center flex-1 cursor-text transition-colors ${absent ? 'bg-red-50 text-red-800 hover:bg-red-100' : 'text-slate-600 hover:bg-slate-50'}`}>
+        <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => { if(!isOverlay) { setEditNoteId(a.id); setEditNoteVal(a.note || ''); } }} className={`px-3 py-2 flex items-center flex-1 min-w-0 text-left cursor-text transition-colors ${absent ? 'bg-red-50 text-red-800 hover:bg-red-100' : 'text-slate-600 hover:bg-slate-50'}`}>
           {a.note ? <span className="font-medium text-[11px] truncate">{a.note}</span> : <span className={`italic flex items-center gap-1.5 text-[10px] ${absent ? 'text-red-400' : 'text-slate-400'}`}><Edit2 className="w-3 h-3"/> Add note</span>}
-        </div>
+        </button>
       )}
       
       {!isOverlay && (
@@ -162,8 +167,8 @@ export function DraggableAssignment(props: AssignmentProps) {
   });
   
   return (
-    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.3 : 1 }} {...attributes} {...listeners} className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}>
-      <AssignmentCardUI {...props} isOverlay={false} />
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.3 : 1 }}>
+      <AssignmentCardUI {...props} isOverlay={false} dragHandleProps={{ ...attributes, ...listeners }} />
     </div>
   );
 }

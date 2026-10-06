@@ -12,6 +12,12 @@ export async function POST(request: Request) {
   if (!employeeId || dayOfWeek === undefined || !startTime || !endTime) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { onLeaveDays: true } });
+  try {
+    if (JSON.parse(employee?.onLeaveDays || '[]').includes(dayOfWeek)) {
+      return NextResponse.json({ error: 'A break cannot be added on an employee day off.' }, { status: 400 });
+    }
+  } catch { /* malformed legacy leave data should not block saving */ }
   const schedule = await prisma.breakSchedule.upsert({
     where: { employeeId_dayOfWeek: { employeeId, dayOfWeek } },
     update: { startTime, endTime },
@@ -19,4 +25,3 @@ export async function POST(request: Request) {
   });
   return NextResponse.json(schedule);
 }
-

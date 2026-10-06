@@ -15,10 +15,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const { dayOfWeek, categoryId, employeeId, note } = await request.json();
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { onLeaveDays: true } });
+  try {
+    if (JSON.parse(employee?.onLeaveDays || '[]').includes(dayOfWeek)) {
+      return NextResponse.json({ error: 'This employee is marked off for the selected day.' }, { status: 400 });
+    }
+  } catch { /* malformed legacy leave data should not block assignments */ }
   const assignment = await prisma.assignment.create({
     data: { dayOfWeek, categoryId, employeeId, note },
     include: { employee: { include: { breakSchedules: true } } }
   });
   return NextResponse.json(assignment);
 }
-

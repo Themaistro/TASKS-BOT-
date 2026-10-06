@@ -11,7 +11,8 @@ export async function POST(request: Request) {
 
     // Get existing assignments from the source day
     const existing = await prisma.assignment.findMany({
-      where: { dayOfWeek: fromDay }
+      where: { dayOfWeek: fromDay },
+      include: { employee: { select: { onLeaveDays: true } } }
     });
 
     if (existing.length === 0) {
@@ -25,8 +26,11 @@ export async function POST(request: Request) {
     });
 
     // Create the clones
+    const available = existing.filter(a => {
+      try { return !JSON.parse(a.employee.onLeaveDays || '[]').includes(toDay); } catch { return true; }
+    });
     await prisma.assignment.createMany({
-      data: existing.map(a => ({
+      data: available.map(a => ({
         categoryId: a.categoryId,
         employeeId: a.employeeId,
         note: a.note,
@@ -34,7 +38,7 @@ export async function POST(request: Request) {
       }))
     });
 
-    return NextResponse.json({ success: true, count: existing.length });
+    return NextResponse.json({ success: true, count: available.length });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to copy roster' }, { status: 500 });
   }

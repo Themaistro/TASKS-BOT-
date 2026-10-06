@@ -3,6 +3,9 @@ FROM node:20-alpine
 # Set working directory
 WORKDIR /app
 
+ENV NODE_OPTIONS="--max-old-space-size=400" \
+    NEXT_TELEMETRY_DISABLED=1
+
 # Copy package files and the Prisma schema FIRST
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -21,4 +24,4 @@ EXPOSE 3000
 
 # Start the background server and Next.js app
 # We run prisma db push at runtime to ensure the PostgreSQL tables are created
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm start"]
+CMD ["sh", "-c", "npx prisma db push && npm start"]

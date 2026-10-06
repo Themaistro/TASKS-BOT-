@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import prisma from '@/lib/prisma';
 
 const ENV_PATH = path.resolve(process.cwd(), '.env');
 
@@ -32,16 +33,16 @@ export async function GET() {
   try {
     const content = fs.readFileSync(ENV_PATH, 'utf-8');
     const vars = parseEnv(content);
-    // Mask tokens -> return only last 6 chars so user can confirm which key is set
-    const mask = (v: string) => v ? '**********' + v.slice(-6) : '';
+    let channelId = vars.SLACK_CHANNEL_ID || '';
+    try { channelId = channelId || (await prisma.config.findUnique({ where: { id: 'global' }, select: { slackChannel: true } }))?.slackChannel || ''; } catch { /* env fallback */ }
     return NextResponse.json({
-      SLACK_BOT_TOKEN: mask(vars.SLACK_BOT_TOKEN || ''),
-      SLACK_APP_TOKEN: mask(vars.SLACK_APP_TOKEN || ''),
-      SLACK_CHANNEL_ID: vars.SLACK_CHANNEL_ID || '',
+      SLACK_BOT_TOKEN: vars.SLACK_BOT_TOKEN || '',
+      SLACK_APP_TOKEN: vars.SLACK_APP_TOKEN || '',
+      SLACK_CHANNEL_ID: channelId,
       hasValues: {
         SLACK_BOT_TOKEN: !!vars.SLACK_BOT_TOKEN,
         SLACK_APP_TOKEN: !!vars.SLACK_APP_TOKEN,
-        SLACK_CHANNEL_ID: !!vars.SLACK_CHANNEL_ID,
+        SLACK_CHANNEL_ID: !!channelId,
       }
     });
   } catch {
@@ -67,9 +68,9 @@ export async function POST(request: Request) {
     }
 
     // Keep DATABASE_URL untouched always
-    fs.writeFileSync(ENV_PATH, serializeEnv(vars), 'utf-8');
+    fs.writeFileSync(ENV_PATH, serializeEnv(vars), { encoding: 'utf-8', flag: 'w' });
 
-    return NextResponse.json({ success: true, needsRestart: !!(body.SLACK_BOT_TOKEN || body.SLACK_APP_TOKEN) });
+    return NextResponse.json({ success: true, saved: { botToken: Boolean(vars.SLACK_BOT_TOKEN), appToken: Boolean(vars.SLACK_APP_TOKEN), channel: Boolean(vars.SLACK_CHANNEL_ID) } });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

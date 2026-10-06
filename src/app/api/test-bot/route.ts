@@ -1,17 +1,28 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { WebClient } from '@slack/web-api';
+import { getSlackClient } from '@/lib/slack';
+import fs from 'fs';
+import path from 'path';
+
+function localEnv(name: string) {
+  try {
+    const line = fs.readFileSync(path.resolve(process.cwd(), '.env'), 'utf8').split(/\r?\n/).find(row => row.trim().startsWith(`${name}=`));
+    return line?.slice(line.indexOf('=') + 1).trim().replace(/^['"]|['"]$/g, '') || '';
+  } catch { return ''; }
+}
 
 export async function POST(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const dayParam = searchParams.get('day');
+  try {
+    const { searchParams } = new URL(request.url);
+    const dayParam = searchParams.get('day');
 
-  const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
-  const channelId = process.env.SLACK_CHANNEL_ID;
+    const slack = await getSlackClient();
+    const config = await prisma.config.findUnique({ where: { id: 'global' } });
+    const channelId = localEnv('SLACK_CHANNEL_ID') || process.env.SLACK_CHANNEL_ID || config?.slackChannel;
 
-  if (!channelId || !process.env.SLACK_BOT_TOKEN) {
-    return NextResponse.json({ error: 'Missing Slack credentials' }, { status: 500 });
-  }
+    if (!channelId || !slack) {
+      return NextResponse.json({ error: 'Connect Slack and choose a target channel first.' }, { status: 400 });
+    }
 
   const now = new Date();
   const dubaimoment = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dubai"}));
@@ -27,40 +38,27 @@ export async function POST(request: Request) {
       }
     });
 
-    const activeCategories = categories.filter(c => c.assignments.length > 0);
+    const isOffToday = (onLeaveDays: string) => {
+      try { return JSON.parse(onLeaveDays || '[]').includes(dubaiDay); } catch { return false; }
+    };
+    const availableCategories = categories.map(category => ({
+      ...category,
+      assignments: category.assignments.filter(assignment => !isOffToday(assignment.employee.onLeaveDays)),
+    }));
+    const activeCategories = availableCategories.filter(c => c.assignments.length > 0);
     if (activeCategories.length === 0) return NextResponse.json({ error: 'No tasks for today to post!' }, { status: 400 });
 
     const fullDate = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dubai', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
 
-    const config = await prisma.config.findUnique({ where: { id: 'global' } });
-
     // 4. Construct message
     const headerText = config?.slackMessageHeader || `📋 *Today's Task Assignments*`;
 
-    // 1. Post Header
-    await slack.chat.postMessage({
-      channel: channelId,
-      text: `🗓️ Roster for ${fullDate}`,
-      blocks: [
-        {
-          type: "header",
-          text: {
-            type: "plain_text",
-            text: `🗓️ Roster for ${fullDate}`,
-            emoji: true
-          }
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: headerText
-          }
-        }
-      ]
-    });
+    const channelBlocks: any[] = [
+      { type: 'header', text: { type: 'plain_text', text: `📋 Team Task Roster · ${fullDate}`, emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text: headerText } },
+      { type: 'divider' },
+    ];
 
-    // 2. Post Each Category
     const employeeTasks: Record<string, { name: string, tasks: any[], breakSchedules?: any[] }> = {};
 
     for (const cat of activeCategories) {
@@ -73,39 +71,12 @@ export async function POST(request: Request) {
       }
 
       const lines = cat.assignments.map((a: any) => {
-        const noteStr = a.note ? `   *${a.note}*` : '';
+        const noteStr = a.note ? ` — _${a.note}_` : '';
         return `• <@${a.employee.slackId}>${noteStr}`;
       }).join('\n');
 
-      await slack.chat.postMessage({
-        channel: channelId,
-        text: `${emoji} ${cat.name}`,
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `*${emoji} ${cat.name}*\n${lines}`
-            }
-          },
-          {
-            type: "actions",
-            elements: [
-              {
-                type: "button",
-                text: {
-                  type: "plain_text",
-                  text: "Acknowledge ✅",
-                  emoji: true
-                },
-                value: `ack_${cat.id}`,
-                action_id: "ack_btn"
-              }
-            ]
-          }
-        ]
-      });
-      await new Promise(r => setTimeout(r, 200));
+      channelBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*${emoji} ${cat.name}*\n${lines}` } });
+      channelBlocks.push({ type: 'actions', block_id: `actions_${cat.id}`, elements: [{ type: 'button', text: { type: 'plain_text', text: '✓ Acknowledge', emoji: true }, value: `ack_${cat.id}`, action_id: 'ack_btn' }] });
     }
 
     // 2.5 Post Consolidated Break Schedule
@@ -121,21 +92,15 @@ export async function POST(request: Request) {
     }
 
     if (breakLines.length > 0) {
-      await slack.chat.postMessage({
-        channel: channelId,
-        text: "☕ Today's Break Schedule",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `*☕ Break Schedule*\n${breakLines.join('\n')}`
-            }
-          }
-        ]
-      });
-      await new Promise(r => setTimeout(r, 200));
+      channelBlocks.push({ type: 'divider' });
+      channelBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*☕ Break Schedule*\n${breakLines.join('\n')}` } });
     }
+
+    channelBlocks.splice(2, 0, { type: 'context', elements: [{ type: 'mrkdwn', text: `👥 *${Object.keys(employeeTasks).length} team members*  •  🗂️ *${activeCategories.length} task categories*` }] });
+    channelBlocks.push({ type: 'divider' });
+    channelBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: 'Please review your assignments and select *Acknowledge* for each relevant task group.' } });
+    channelBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `Posted automatically by Task Bot • ${fullDate}` }] });
+    await slack.chat.postMessage({ channel: channelId, text: `Team task roster for ${fullDate}`, blocks: channelBlocks.slice(0, 50) });
 
     for (const slackId of Object.keys(employeeTasks)) {
       const { name, tasks, breakSchedules: empSchedules } = employeeTasks[slackId];
@@ -153,7 +118,7 @@ export async function POST(request: Request) {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `Good morning ${name.split(' ')[0]}! ☕\nHere are your assigned tasks for today:\n\n${taskLines}${breakLine}`
+                text: `Good morning, *${name.split(' ')[0]}* 👋\n\nHere is your task schedule for *${fullDate}*:\n\n${taskLines}${breakLine}\n\nPlease review the team roster in <#${channelId}> and acknowledge your task group.`
               }
             }
           ]
@@ -164,6 +129,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error?.data?.error || error?.message || 'Slack rejected the request.' }, { status: 500 });
+  }
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Unable to prepare the Slack request.' }, { status: 500 });
   }
 }

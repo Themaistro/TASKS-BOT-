@@ -28,15 +28,18 @@ app.prepare().then(() => {
       if (body.type === 'block_actions' && body.actions?.[0]?.action_id === 'ack_btn') {
         const userId = body.user.id;
         const originalBlocks = body.message.blocks;
+        const categoryId = String(body.actions[0].value || '').replace('ack_', '');
+        const ackBlockId = `ack_${categoryId}`;
+        const actionBlockId = `actions_${categoryId}`;
         
-        let ackBlock = originalBlocks.find(b => b.block_id === 'ack_block');
+        let ackBlock = originalBlocks.find(b => b.block_id === ackBlockId);
         if (!ackBlock) {
           ackBlock = {
             type: 'context',
-            block_id: 'ack_block',
+            block_id: ackBlockId,
             elements: [{ type: 'mrkdwn', text: `*✅ Acknowledged by:* <@${userId}>` }]
           };
-          const actionsIdx = originalBlocks.findIndex((b) => b.type === 'actions');
+          const actionsIdx = originalBlocks.findIndex((b) => b.block_id === actionBlockId);
           if (actionsIdx > -1) {
             originalBlocks.splice(actionsIdx, 0, ackBlock); // Slide it in right above the button
           } else {
@@ -72,9 +75,9 @@ app.prepare().then(() => {
   createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
-  }).listen(3000, (err) => {
+  }).listen(process.env.PORT || 3000, '0.0.0.0', (err) => {
     if (err) throw err;
-    console.log('> Web server is up and running on http://localhost:3000');
+    console.log(`> Web server is up and running on port ${process.env.PORT || 3000}`);
     
     if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_CHANNEL_ID) {
       console.warn('[WARNING] Heads up: SLACK_BOT_TOKEN or SLACK_CHANNEL_ID is missing. The bot won\'t be able to post messages.');
@@ -111,7 +114,14 @@ app.prepare().then(() => {
           }
         });
 
-        const activeCategories = categories.filter(c => c.assignments.length > 0);
+        const isOffToday = (onLeaveDays) => {
+          try { return JSON.parse(onLeaveDays || '[]').includes(currentDay); } catch { return false; }
+        };
+        const availableCategories = categories.map(category => ({
+          ...category,
+          assignments: category.assignments.filter(assignment => !isOffToday(assignment.employee.onLeaveDays)),
+        }));
+        const activeCategories = availableCategories.filter(c => c.assignments.length > 0);
         if (activeCategories.length === 0) return; // Nobody is scheduled today, skip it
 
         console.log(`[${currentTimeStr} ${tz}] Time to post the daily roster!`);
@@ -120,15 +130,11 @@ app.prepare().then(() => {
 
         if (targetChannel && process.env.SLACK_BOT_TOKEN) {
           const headerText = config.slackMessageHeader || `:clipboard: *Today's Task Assignments*`;
-          await slack.chat.postMessage({
-            channel: targetChannel,
-            text: `:calendar: Daily Roster for ${fullDateStr}`,
-            blocks: [
-              { type: "header", text: { type: "plain_text", text: `📅 Daily Roster for ${fullDateStr}`, emoji: true } },
-              { type: "section", text: { type: "mrkdwn", text: headerText } }
-            ]
-          });
-
+          const channelBlocks = [
+            { type: 'header', text: { type: 'plain_text', text: `📋 Team Task Roster · ${fullDateStr}`, emoji: true } },
+            { type: 'section', text: { type: 'mrkdwn', text: headerText } },
+            { type: 'divider' }
+          ];
           const employeeTasks = {};
           
           // Loop through categories and drop a message for each one
@@ -141,20 +147,12 @@ app.prepare().then(() => {
             }
 
             const assignments = cat.assignments.map(a => {
-              const noteStr = a.note ? `   *${a.note}*` : '';
+              const noteStr = a.note ? ` — _${a.note}_` : '';
               return `• <@${a.employee.slackId}>${noteStr}`;
             }).join('\n');
 
-            await slack.chat.postMessage({
-              channel: targetChannel,
-              text: `${emoji} ${cat.name}`,
-              blocks: [
-                { type: "section", text: { type: "mrkdwn", text: `*${emoji} ${cat.name}*\n${assignments}` } },
-                { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "Acknowledge", emoji: true }, value: `ack_${cat.id}`, action_id: "ack_btn" }] }
-              ]
-            });
-            // Small pause so Slack doesn't get overwhelmed and mix up the message order
-            await new Promise(r => setTimeout(r, 200));
+            channelBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*${emoji} ${cat.name}*\n${assignments}` } });
+            channelBlocks.push({ type: 'actions', block_id: `actions_${cat.id}`, elements: [{ type: 'button', text: { type: 'plain_text', text: '✓ Acknowledge', emoji: true }, value: `ack_${cat.id}`, action_id: 'ack_btn' }] });
           }
 
           const breakLines = [];
@@ -169,13 +167,15 @@ app.prepare().then(() => {
           }
 
           if (breakLines.length > 0) {
-            await slack.chat.postMessage({
-              channel: targetChannel,
-              text: ":coffee: Today's Break Schedule",
-              blocks: [{ type: "section", text: { type: "mrkdwn", text: `*:coffee: Break Schedule*\n${breakLines.join('\n')}` } }]
-            });
-            await new Promise(r => setTimeout(r, 200));
+            channelBlocks.push({ type: 'divider' });
+            channelBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*☕ Break Schedule*\n${breakLines.join('\n')}` } });
           }
+
+          channelBlocks.splice(2, 0, { type: 'context', elements: [{ type: 'mrkdwn', text: `👥 *${Object.keys(employeeTasks).length} team members*  •  🗂️ *${activeCategories.length} task categories*` }] });
+          channelBlocks.push({ type: 'divider' });
+          channelBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: 'Please review your assignments and select *Acknowledge* for each relevant task group.' } });
+          channelBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `Posted automatically by Task Bot • ${fullDateStr}` }] });
+          await slack.chat.postMessage({ channel: targetChannel, text: `Team task roster for ${fullDateStr}`, blocks: channelBlocks.slice(0, 50) });
 
           // Shoot over a private DM to everyone working today
           for (const slackId of Object.keys(employeeTasks)) {
@@ -189,7 +189,7 @@ app.prepare().then(() => {
               await slack.chat.postMessage({
                 channel: slackId,
                 text: `:wave: Your tasks for today`,
-                blocks: [{ type: "section", text: { type: "mrkdwn", text: `Good morning ${name.split(' ')[0]}! :wave:\nHere are your assigned tasks for today:\n\n${taskLines}${breakLine}` } }]
+                blocks: [{ type: "section", text: { type: "mrkdwn", text: `Good morning, *${name.split(' ')[0]}* 👋\n\nHere is your task schedule for *${fullDateStr}*:\n\n${taskLines}${breakLine}\n\nPlease review the team roster in <#${targetChannel}> and acknowledge your task group.` } }]
               });
               await new Promise(r => setTimeout(r, 200));
             } catch (e) {
