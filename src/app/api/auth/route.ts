@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createSessionToken, SESSION_LIFETIME_SECONDS } from '@/lib/session';
 
 const configuredUsername = () => process.env.ADMIN_USERNAME || 'admin';
 const configuredPassword = () => process.env.ADMIN_PASSWORD || 'admin';
@@ -14,12 +15,12 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set('task_bot_session', 'authenticated', {
+    response.cookies.set('task_bot_session', await createSessionToken(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: SESSION_LIFETIME_SECONDS,
     });
     return response;
   } catch {

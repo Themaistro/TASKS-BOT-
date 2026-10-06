@@ -1,5 +1,6 @@
 {
-  "name": "tradeling-task-bot",
+  "name": "task-bot",
+  "description": "Weekly team scheduling and Slack roster automation",
   "version": "0.1.0",
   "private": true,
   "scripts": {

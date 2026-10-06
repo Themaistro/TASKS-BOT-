@@ -15,7 +15,7 @@ const handle = app.getRequestHandler();
 const prisma = new PrismaClient();
 
 app.prepare().then(() => {
-  // Fire up the Slack Socket Mode connection if we have a token
+  // Start Slack Socket Mode when an app token is configured.
   const appToken = process.env.SLACK_APP_TOKEN;
   if (appToken) {
     const socketClient = new SocketModeClient({ appToken });
@@ -60,7 +60,7 @@ app.prepare().then(() => {
             blocks: originalBlocks
           });
         } catch (e) {
-          console.error('Oops, ran into an issue updating the Slack message:', e);
+          console.error('Failed to update the Slack acknowledgement message:', e);
         }
       }
     });
@@ -80,12 +80,12 @@ app.prepare().then(() => {
     console.log(`> Web server is up and running on port ${process.env.PORT || 3000}`);
     
     if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_CHANNEL_ID) {
-      console.warn('[WARNING] Heads up: SLACK_BOT_TOKEN or SLACK_CHANNEL_ID is missing. The bot won\'t be able to post messages.');
+      console.warn('[WARNING] Slack posting is disabled because the bot token or channel ID is missing.');
     }
 
     const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
-    // Kick off the background cron job to post the roster every minute (if it matches the scheduled time)
+    // Check the configured posting schedule once per minute.
     cron.schedule('* * * * *', async () => {
       try {
         const config = await prisma.config.findUnique({ where: { id: 'global' } });
@@ -103,7 +103,7 @@ app.prepare().then(() => {
         // Only run if the current minute matches the scheduled post time
         if (config.postTime !== currentTimeStr) return;
 
-        // Grab all categories that actually have people assigned to them today
+        // Load categories that have assignments for the current day.
         const categories = await prisma.category.findMany({
           orderBy: { order: 'asc' },
           include: {
@@ -137,7 +137,7 @@ app.prepare().then(() => {
           ];
           const employeeTasks = {};
           
-          // Loop through categories and drop a message for each one
+          // Add one section and acknowledgement action per category.
           for (const cat of activeCategories) {
             const emoji = cat.icon || ':pushpin:';
             for (const a of cat.assignments) {
@@ -177,7 +177,7 @@ app.prepare().then(() => {
           channelBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `Posted automatically by Task Bot • ${fullDateStr}` }] });
           await slack.chat.postMessage({ channel: targetChannel, text: `Team task roster for ${fullDateStr}`, blocks: channelBlocks.slice(0, 50) });
 
-          // Shoot over a private DM to everyone working today
+          // Send each scheduled team member a personal summary.
           for (const slackId of Object.keys(employeeTasks)) {
             const { name, tasks, breakSchedules: empSchedules } = employeeTasks[slackId];
             const taskLines = tasks.map((t) => `${t.emoji} *${t.catName}*${t.note ? `\n> _${t.note}_` : ''}`).join('\n\n');
